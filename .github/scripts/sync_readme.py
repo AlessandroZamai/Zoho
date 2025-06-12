@@ -1,8 +1,13 @@
 import os
 import json
+import logging
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
 
@@ -13,21 +18,37 @@ def get_credentials():
         raise ValueError("GOOGLE_REFRESH_TOKEN environment variable not set")
         
     # Load client secrets from credentials file
-    with open('credentials.json', 'r') as f:
-        client_config = json.load(f)
+    try:
+        with open('credentials.json', 'r') as f:
+            file_content = f.read()
+            logger.debug(f"Credentials file content: {file_content}")
+            client_config = json.loads(file_content)
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding JSON: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Error reading credentials file: {str(e)}")
+        raise
         
-    credentials = Credentials(
-        None,  # No token initially
-        refresh_token=refresh_token,
-        token_uri='https://oauth2.googleapis.com/token',
-        client_id=client_config['web']['client_id'],
-        client_secret=client_config['web']['client_secret'],
-        scopes=SCOPES
-    )
-    
-    # Force token refresh
-    credentials.refresh(None)
-    return credentials
+    try:
+        credentials = Credentials(
+            None,  # No token initially
+            refresh_token=refresh_token,
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=client_config['web']['client_id'],
+            client_secret=client_config['web']['client_secret'],
+            scopes=SCOPES
+        )
+        
+        # Force token refresh
+        credentials.refresh(None)
+        return credentials
+    except KeyError as e:
+        logger.error(f"KeyError: {str(e)}. Client config: {client_config}")
+        raise
+    except Exception as e:
+        logger.error(f"Error creating credentials: {str(e)}")
+        raise
 
 def get_document_content(service, document_id):
     """Retrieves the content of a Google Doc."""
@@ -98,26 +119,27 @@ def main():
         if not document_id:
             raise ValueError("DOCUMENT_ID environment variable not set")
 
-        # Initialize the Docs API client
+        logger.info("Initializing credentials")
         credentials = get_credentials()
+        logger.info("Building service")
         service = build('docs', 'v1', credentials=credentials)
 
-        # Get the document content
+        logger.info("Fetching document content")
         document = get_document_content(service, document_id)
         if not document:
             raise Exception("Failed to fetch document content")
 
-        # Convert to Markdown
+        logger.info("Converting to Markdown")
         markdown_content = convert_to_markdown(document)
 
-        # Write to README.md
+        logger.info("Writing to README.md")
         with open('README.md', 'w', encoding='utf-8') as f:
             f.write(markdown_content)
 
-        print("Successfully updated README.md")
+        logger.info("Successfully updated README.md")
 
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        logger.exception("An error occurred")
         exit(1)
 
 if __name__ == '__main__':

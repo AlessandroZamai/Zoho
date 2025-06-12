@@ -27,7 +27,7 @@ jobs:
 
       - name: Create OAuth credentials file
         run: |
-          echo "${{ secrets.GOOGLE_OAUTH_CREDENTIALS }}" > credentials.json
+          echo '${{ secrets.GOOGLE_OAUTH_CREDENTIALS }}' | jq '.' > credentials.json
 
       - name: Sync README
         env:
