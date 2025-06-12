@@ -15,6 +15,7 @@ def get_credentials():
     """Gets credentials using refresh token."""
     refresh_token = os.environ.get('GOOGLE_REFRESH_TOKEN')
     if not refresh_token:
+        logger.error("GOOGLE_REFRESH_TOKEN environment variable not set")
         raise ValueError("GOOGLE_REFRESH_TOKEN environment variable not set")
         
     # Load client secrets from credentials file
@@ -31,6 +32,7 @@ def get_credentials():
         raise
         
     try:
+        logger.debug(f"Client config: {client_config}")
         credentials = Credentials(
             None,  # No token initially
             refresh_token=refresh_token,
@@ -41,13 +43,18 @@ def get_credentials():
         )
         
         # Force token refresh
+        logger.info("Refreshing token")
         credentials.refresh(None)
+        logger.info("Token refreshed successfully")
         return credentials
     except KeyError as e:
         logger.error(f"KeyError: {str(e)}. Client config: {client_config}")
         raise
+    except AttributeError as e:
+        logger.error(f"AttributeError: {str(e)}. This might indicate that the Credentials object is None.")
+        raise
     except Exception as e:
-        logger.error(f"Error creating credentials: {str(e)}")
+        logger.error(f"Error creating or refreshing credentials: {str(e)}")
         raise
 
 def get_document_content(service, document_id):
@@ -120,26 +127,54 @@ def main():
             raise ValueError("DOCUMENT_ID environment variable not set")
 
         logger.info("Initializing credentials")
-        credentials = get_credentials()
+        try:
+            credentials = get_credentials()
+            if not credentials:
+                raise ValueError("Failed to obtain credentials")
+        except Exception as e:
+            logger.error(f"Error getting credentials: {str(e)}")
+            raise
+
         logger.info("Building service")
-        service = build('docs', 'v1', credentials=credentials)
+        try:
+            service = build('docs', 'v1', credentials=credentials)
+            if not service:
+                raise ValueError("Failed to build service")
+        except Exception as e:
+            logger.error(f"Error building service: {str(e)}")
+            raise
 
         logger.info("Fetching document content")
-        document = get_document_content(service, document_id)
-        if not document:
-            raise Exception("Failed to fetch document content")
+        try:
+            document = get_document_content(service, document_id)
+            if not document:
+                raise ValueError("Failed to fetch document content")
+        except Exception as e:
+            logger.error(f"Error fetching document: {str(e)}")
+            raise
 
         logger.info("Converting to Markdown")
-        markdown_content = convert_to_markdown(document)
+        try:
+            markdown_content = convert_to_markdown(document)
+            if not markdown_content:
+                raise ValueError("Failed to convert document to Markdown")
+        except Exception as e:
+            logger.error(f"Error converting to Markdown: {str(e)}")
+            raise
 
         logger.info("Writing to README.md")
-        with open('README.md', 'w', encoding='utf-8') as f:
-            f.write(markdown_content)
+        try:
+            with open('README.md', 'w', encoding='utf-8') as f:
+                f.write(markdown_content)
+        except Exception as e:
+            logger.error(f"Error writing to README.md: {str(e)}")
+            raise
 
         logger.info("Successfully updated README.md")
 
     except Exception as e:
-        logger.exception("An error occurred")
+        logger.error(f"Fatal error: {str(e)}")
+        logger.exception("Stack trace:")
         exit(1)
 
 if __name__ == '__main__':
