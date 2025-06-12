@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib markdown2
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib google-auth-transport-requests markdown2
 
       - name: Create OAuth credentials file
         run: |
