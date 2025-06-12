@@ -1,116 +1,120 @@
-Dealer Setup Guide: Google Sheet + App Script & Zoho Webhook Integration
-This document provides step-by-step instructions for partners to set up the Google Spreadsheet template, integrate the provided Google Apps Script files, update them with their unique API token, and test the webhook integration with Zoho CRM.
-Prerequisites
-Before you begin, ensure you have:
-A Google account with access to Google Sheets and Google Apps Script.
-The Webhook Sample Template w_Script.xlsx - Sheet1.csv file.
-The create_trigger_script.txt and send_to_webhook_script.txt files containing the Google Apps Script code.
-Your unique Zoho API AUTH_TOKEN_NAME and AUTH_TOKEN_VALUE provided by TELUS. If you do not have this, or have lost it, email dltrlzohodev@telus.com.
-Step 1: Create a New Google Spreadsheet and Import the Template
-Open Google Sheets: Go to sheets.google.com.
-Create a New Blank Spreadsheet: Click on + Blank spreadsheet.
-Rename the Spreadsheet: Rename your new spreadsheet (e.g., "TELUS Lead Capture Webhook"). Go to File > Rename and enter the desired name.
-Import the CSV Template:
-Go to File > Import.
-Select the Upload tab.
-Click Browse and select the Webhook Sample Template w_Script.csv file that was shared with you.
-In the Import options, choose:
-Import location: Replace spreadsheet (this will replace the blank sheet with the template data).
-Separator type: Detect automatically.
-Convert text to numbers, dates, and formulas: Yes.
-Click Import data. Your spreadsheet should now have the correct headers and initial data from the template.
-Step 2: Create a New Google Apps Script Project and Attach the Scripts
-Open the Script Editor: While your Google Spreadsheet is open, go to Extensions > Apps Script. This will open a new browser tab with the Apps Script editor, automatically linked to your spreadsheet.
-Delete Existing Code: In the Apps Script editor, you'll see a default file named Code.gs with a myFunction() template. Delete all the content within Code.gs.
-Add sendToWebhook Script:
-In the Apps Script editor, click on + next to "Files" (or File > New > Script file).
-Name the new file sendToWebhook.gs (or any other descriptive name).
-Delete all the content within sendToWebhook.gs
-Open the send_to_webhook_script.txt file you received in a text editor.
-Copy all the content from this file.
-Paste it into the Code.gs file in the Apps Script editor.
-Add createTrigger Script:
-In the Apps Script editor, click on + next to "Files" (or File > New > Script file).
-Delete all the content within createTrigger.gs
-Name the new file createTrigger.gs (or any other descriptive name).
-Open the create_trigger_script.txt file you received in a text editor.
-Copy all the content from this file.
-Paste it into the newly created createTrigger.gs file.
-Save the Project: Click the Save project icon (looks like a floppy disk) in the Apps Script editor.
-Step 3: Update the Script with Your Unique API Token and Sales Rep Assignment
-Locate sendToWebhook function: In the Apps Script editor, open the Code.gs file.
-Update API Tokens:
-Locate the line:
-const AUTH_TOKEN_NAME = 'EnterAuthTokenName'; //Fill in this field with the token name you were provided
-Replace 'EnterAuthTokenName' with the actual AUTH_TOKEN_NAME provided by TELUS (e.g., 'dealerName_token').
-Locate the line:
-const AUTH_TOKEN_VALUE = 'EnterAuthTokenValue'; //Fill in this field with the token value you were provided
-Replace 'EnterAuthTokenValue' with the actual AUTH_TOKEN_VALUE provided by TELUS (e.g., 'asdFweF234Asdfhg234kjlaSdf').
-Example Updated Lines:
-const AUTH_TOKEN_NAME = 'dealerName_token';
-const AUTH_TOKEN_VALUE = 'asdFweF234Asdfhg234kjlaSdf';
+# **Webhook Documentation**
 
-Configure Sales Rep Assignment: In the payload section of the sendToWebhook function, you will see fields related to assigning the lead to a sales representative. You need to choose ONE of the following methods for lead assignment. The other methods should remain commented out (// at the beginning of the line).
-Option A: Using Sales Rep Pin (Recommended Default)
-Locate the line:
-SalesRepPin: "MBPS", // Enter the CPMS SalesRepPin of the user you want new leads assgined to
-Replace "MBPS" with the actual CPMS Sales Rep Pin provided for your assignment (e.g., "1B2C").
-Ensure the AssignToSalesRepUserID and AssignToSalesRepEmail lines directly below this are commented out (they should start with //).
-Example (Option A):
-SalesRepPin: "1B2C", // Enter the CPMS SalesRepPin of the user you want new leads assgined to
-// AssignToSalesRepUserID: "5877708000011780014", // Enter the Zoho UserID of the user you want new leads assgined to. Email dltrlzohodev@telus.com if you do not know your 19 digit Zoho user ID number
-// AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
-Option B: Using Zoho User ID (Alternative)
-Locate the line:
-AssignToSalesRepUserID: "5877708000011780014", // Enter the Zoho UserID of the user you want new leads assgined to. Email dltrlzohodev@telus.com if you do not know your 19 digit Zoho user ID number
-Uncomment this line by removing the // at the beginning.
-Replace "5877708000011780014" with the 19-digit Zoho User ID of the sales rep you want to assign leads to. (If you don't know this, email dltrlzohodev@telus.com).
-Ensure the SalesRepPin and AssignToSalesRepEmail lines are commented out.
-Example (Option B):
-// SalesRepPin: "MBPS", // Commented out
-AssignToSalesRepUserID: "1234567890123456789", // Enter the Zoho UserID of the user you want new leads assgined to.
-// AssignToSalesRepEmail: "example@email.com", // Commented out
-Option C: Using Sales Rep Email (Alternative)
-Locate the line:
-AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
-Uncomment this line by removing the // at the beginning.
-Replace "example@email.com" with the email address of the sales rep you want to assign leads to.
-Ensure the SalesRepPin and AssignToSalesRepUserID lines are commented out.
-Example (Option C):
-// SalesRepPin: "MBPS", // Commented out
-// AssignToSalesRepUserID: "5877708000011780014", // Commented out
-AssignToSalesRepEmail: "salesrep@yourdomain.com", // Enter the email address of the user you want new leads assigned to
-Save Changes: Click the Save project icon again.
-Step 4: Create the onEdit Trigger
-This step will set up the automatic sending of data when a new row is added or an existing row is edited in your spreadsheet.
-Open createTrigger.gs: In the Apps Script editor, open the createTrigger.gs file.
-Run createTrigger Function:
-In the toolbar, next to the "Run" button, there's a dropdown menu (it might say (no function selected) or createTrigger). Select createTrigger from this dropdown.
-Click the Run button (looks like a play icon).
-Review Permissions (First Run Only):
-The first time you run a script that accesses Google services (like SpreadsheetApp, UrlFetchApp, Session), you will be prompted to authorize it.
-Click Review permissions.
-Select your Google account.
-Click Allow to grant the necessary permissions.
-Confirm Trigger Creation:
-After the script runs, go to Executions (the clock icon on the left sidebar) to see if the createTrigger function executed successfully. You should see a "Completed" status.
-You can also click the Triggers icon (looks like an alarm clock) on the left sidebar. You should see a trigger listed for the sendToWebhook function, with the Event Type set to On edit.
-Important: This createTrigger function is designed to delete any existing sendToWebhook triggers before creating a new one. This ensures you only have one active trigger. You only need to run createTrigger() once.
-Step 5: Test the Webhook Integration
-Go to Your Google Spreadsheet: Open the Google Sheet where you imported the template.
-Add a New Row of Data: In the spreadsheet, go to the last empty row and start entering data. Fill in at least the required fields (First Name, Last Name, Phone, Consent to Contact, Created By Email, Campaign Start Date, Campaign End Date, Campaign Name, Datahub Src).
-Trigger the Webhook: As you type and move out of the last cell in the row (e.g., by pressing Enter or clicking elsewhere), the onEdit trigger will fire, and the sendToWebhook function will attempt to send the data to Zoho.
-Check Apps Script Logs for Success/Errors:
-Go back to the Apps Script editor.
-Click on Executions (the clock icon on the left sidebar).
-You should see a recent execution for sendToWebhook. Click on it.
-Review the Logs tab. You should see:
-Confirmation that the function started.
-The data retrieved from your sheet.
-The prepared payload.
-The webhook URL and options.
-Crucially, a Webhook response: line. If successful, you should see Zoho's "success" message. If there's an error, the logs will show the detailed error response from Zoho, helping you troubleshoot further.
-Example of a successful log line: Webhook response: {"code":"success","details":{"output":"{\"data\":[{\"code\":\"SUCCESS\"}]}", ... }
-Verify in Zoho CRM: Check your Zoho CRM instance to confirm that a new lead has been created with the data you entered in the spreadsheet.
-If you encounter any errors in the Apps Script logs, review the messages carefully. They often provide clues on what needs to be adjusted in your spreadsheet data or Zoho configuration.
+# **Purpose**
+
+The Zoho webhook is designed to capture lead information and send it to Zoho CRM.
+
+# **Approval Process**
+
+To access the Zoho webhook please follow the below process:
+
+1. Contact the Book of Business team to request access to the Zoho webhook BY DOING BLANK and provide email address for any developer that needs access to the Zoho Sandbox.  
+   1. Within X days the Book of Business team will respond to your request  
+2. Once approved:  
+   1. You’ll receive an email with a link to your organization’s authentication token (“auth\_token\_name” and “auth\_token\_value”). This link will expire after 7 days.  
+   2. Your developers will be granted access to the Zoho Sandbox  
+3. Use the Sandbox URL to test sending data to Zoho. Once you are satisfied with the results, email [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com) and a TELUS developer will validate your test data and provide you with the production webhook url.
+
+**Questions?**
+
+* Technical inquiries can be sent to [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com)  
+* Non-technical or program related questions can be sent to [DLR-BOB@telus.com](mailto:DLR-BOB@telus.com)
+
+**How to Connect**  
+**Option \#1**
+
+- Connect Google Sheets directly with Zoho using Google App Scripts  
+- **Guide:** [Zoho | Google App Script + Google Sheet Webhook Setup Guide (Dealers)](https://docs.google.com/document/d/1kftsY9KZa27xBzZ7189bu1S2Fqd1bVfXec4VHZNlXcs/edit?tab=t.0#heading=h.wir9zfzf3130)  
+- **Templates:**   
+  - [Webhook Sample Template w/Script](https://docs.google.com/spreadsheets/d/1oeYnSNhvaDGVlSK48T_nllv7_U6oIXymqC2oxL80mYo/edit?gid=0#gid=0)  
+  - [Zoho \_ Webhook Template \+ App Script.csv](https://drive.google.com/file/d/17m3S7mPBBx7qA6Nh4BxPFuxwxYAJfv1G/view?usp=drive_link)  
+  - [Send\_to\_webhook\_script.txt](https://drive.google.com/file/d/1asSxAyScKIMItP9uPccD7VJdqV2XZTPz/view?usp=drive_link)  
+  - [create\_trigger\_script.txt](https://drive.google.com/file/d/1AD1lBP-FjldGDCq_XySFKLAMOvVlkc10/view?usp=drive_link)
+
+**Option \#2**
+
+- Connect Zapier with Zoho  
+  - **Event type** \= POST  
+  - **Sandbox URL:** https://sandbox.zohoapis.com/crm/v7/functions/telus\_webhook\_to\_capture\_lead/actions/execut e?auth\_type=apikey\&zapikey=1003.889f987039f9ee27f3c76f676263a8f4.5409f4070de428bf66 46fad109b33cc0  
+  - **Payload type** \= json  
+  - **Mapping \=** You must map your source data fields to the relevant **API Name** listed in the table below.
+
+# **API Parameters**
+
+| Field Name in CRM UI | API Name | Description | Required? |
+| ----- | :---- | :---- | ----- |
+| auth\_token\_name | auth\_token\_name | Email [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com) to receive your organization’s token | Yes |
+| auth\_token\_value | auth\_token\_value |  | Yes |
+| First Name | First\_Name |  | Yes |
+| Last Name | Last\_Name |  | Yes |
+| Phone | Phone | Must contain 10 digits without symbols or spaces | Yes |
+| Consent to Contact Captured | Consent\_to\_Contact\_Captured | Pass “true” for value | Yes |
+| Created By Email | Created\_By\_Email | Individual responsible for data source that TELUS can contact | Yes |
+| Campaign Start Date | Campaign\_Start\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
+| Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
+| Quote Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
+| Campaign\_Name | Campaign\_Name |  | Yes |
+| Street | Street |  | No |
+| City | City |  | No |
+| Province | State |  | No |
+| Postal Code | Zip\_Code | 6-digits can include spaces | No |
+| Country | Country |  | No |
+| Rate Plan Description | Rate\_Plan\_Description |  | No |
+| Device Model | Phone\_Model |  | No |
+| Current Provider | Brand |  | No |
+| Description | Description | Describe what you want your sales reps to know about this lead.  Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
+| Note | note | Add note to the lead. To add new line in the note use “\\n” | No |
+| notify\_record\_owner | notify\_record\_owner | Pass boolean “true” to send email notification on lead creation to record owner | No |
+| **CORPORATE STORES** |  |  |  |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
+| SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
+| AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
+| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
+| **DEALERS** |  |  |  |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. |
+| SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
+| AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
+| **MobileKlinik** |  |  |  |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
+| SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
+| AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
+| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
+
+## **Request Additional Fields**
+
+If you want to pass value to additional fields not outlined above, contact [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com).
+
+## **Request Body**
+
+The request body should contain the lead information in JSON format.
+
+### **Example JSON Payload**
+
+```
+Test webhook json body:
+{
+"auth_token_name": "example_token",
+"auth_token_value": "exampletoken",
+"AssignToSalesRepUserID": "0123456789",
+"First_Name":"test apple",
+"Last_Name":"Test postman",
+"Phone":"1231231234",
+"Rate_Plan_Description": "$55 Unlimited US/CAN",
+"Phone_Model": "samsung",
+"Consent_to_Contact_Captured": true,
+"Created_By_Email": "example@email.com",
+"Campaign_Start_Date": "2025-03-13",
+"Campaign_End_Date": "2025-03-13",
+"Campaign_Name": "Test campaign",
+"Datahub_Src": "example.com web lead",
+"note": “exmaple note”
+}
+```
+
+# **Implementation Notes**
+
+* Ensure the API key is securely stored and not exposed.  
+* Test the webhook thoroughly with various data inputs.  
+* Handle potential error responses appropriately.  
+* Monitor the webhook for performance and reliability.
 
