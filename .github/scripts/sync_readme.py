@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-import google.auth.transport.requests
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -45,7 +45,7 @@ def get_credentials():
         
         # Force token refresh
         logger.info("Refreshing token")
-        request = google.auth.transport.requests.Request()
+        request = Request()
         credentials.refresh(request)
         logger.info("Token refreshed successfully")
         return credentials
