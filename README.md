@@ -35,7 +35,7 @@ To access the Zoho webhook please follow the below process:
 
 - Connect Zapier with Zoho  
   - **Event type** \= POST  
-  - **Sandbox URL:** https://sandbox.zohoapis.com/crm/v7/functions/telus\_webhook\_to\_capture\_lead/actions/execut e?auth\_type=apikey\&zapikey=1003.889f987039f9ee27f3c76f676263a8f4.5409f4070de428bf66 46fad109b33cc0  
+  - **Sandbox URL:** https://sandbox.zohoapis.com/crm/v7/functions/telus\_webhook\_to\_capture\_lead/actions/execute?auth\_type=apikey\&zapikey=1003.889f987039f9ee27f3c76f676263a8f4.5409f4070de428bf6646fad109b33cc0  
   - **Payload type** \= json  
   - **Mapping \=** You must map your source data fields to the relevant **API Name** listed in the table below.
 
