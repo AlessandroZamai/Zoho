@@ -7,7 +7,16 @@ const AUTH_TOKEN_VALUE = 'EnterAuthTokenValue'; //Fill in this field with the to
 function sendToWebhook(e) {
   Logger.log('sendToWebhook function started.');
   Logger.log('Event object (e): ' + JSON.stringify(e));
-
+  
+  // Check if AUTH_TOKEN_NAME and AUTH_TOKEN_VALUE are set
+  if (AUTH_TOKEN_NAME === 'EnterAuthTokenName') {
+    Logger.log('AUTH_TOKEN_NAME is not set. Please set it to the token name you were provided.');
+    return;
+  }
+  if (AUTH_TOKEN_VALUE === 'EnterAuthTokenValue') {
+    Logger.log('AUTH_TOKEN_VALUE is not set. Please set it to the token value you were provided.');
+    return;
+  }
   // This function will be triggered when a new row is added
   if (e && e.range && e.range.getRow() == 1) { // Added e.range check for robustness
     Logger.log('Header row change detected. Ignoring.');
