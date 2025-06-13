@@ -68,9 +68,28 @@ def get_document_content(service, document_id):
         print(f'An error occurred: {err}')
         return None
 
+def is_list_item(paragraph):
+    """Check if paragraph is a list item."""
+    return 'bullet' in paragraph or 'numbering' in paragraph.get('paragraphStyle', {})
+
+def get_list_marker(paragraph, list_id_to_level):
+    """Get the appropriate list marker."""
+    if 'bullet' in paragraph:
+        return '- '
+    elif 'paragraphStyle' in paragraph and 'numbering' in paragraph['paragraphStyle']:
+        list_id = paragraph['paragraphStyle']['numbering'].get('listId', '')
+        level = list_id_to_level.get(list_id, 1)
+        list_id_to_level[list_id] = level + 1
+        return f"{level}. "
+    return ''
+
 def convert_to_markdown(document):
     """Converts Google Doc content to Markdown format."""
     content = []
+    list_id_to_level = {}
+    in_code_block = False
+    in_table = False
+    table_data = []
     
     for element in document.get('body').get('content'):
         if 'paragraph' in element:
@@ -84,17 +103,63 @@ def convert_to_markdown(document):
                     if 'HEADING' in named_style:
                         level = int(named_style[-1])  # Get heading level
                         text = get_text_from_paragraph(paragraph)
-                        content.append(f"{'#' * level} {text}\n")
+                        content.append(f"{'#' * level} {text.strip()}\n\n")
                         continue
+            
+            # Handle lists
+            if is_list_item(paragraph):
+                marker = get_list_marker(paragraph, list_id_to_level)
+                text = get_text_from_paragraph(paragraph)
+                indent = '  ' * (paragraph.get('indentLevel', 0))
+                content.append(f"{indent}{marker}{text}\n")
+                continue
+            
+            # Handle code blocks
+            if 'COURIER_NEW' in str(paragraph):
+                if not in_code_block:
+                    content.append('```\n')
+                    in_code_block = True
+                text = get_text_from_paragraph(paragraph, preserve_whitespace=True)
+                content.append(f"{text}\n")
+                continue
+            elif in_code_block:
+                content.append('```\n\n')
+                in_code_block = False
             
             # Regular paragraph
             text = get_text_from_paragraph(paragraph)
             if text:
                 content.append(f"{text}\n\n")
+        
+        # Handle tables
+        elif 'table' in element:
+            table = element.get('table')
+            table_data = []
+            for row in table.get('tableRows', []):
+                row_data = []
+                for cell in row.get('tableCells', []):
+                    cell_content = []
+                    for content_item in cell.get('content', []):
+                        if 'paragraph' in content_item:
+                            text = get_text_from_paragraph(content_item['paragraph'])
+                            cell_content.append(text)
+                    row_data.append(' '.join(cell_content))
+                table_data.append(row_data)
+            
+            # Convert table data to markdown
+            if table_data:
+                # Header row
+                content.append('| ' + ' | '.join(table_data[0]) + ' |\n')
+                # Separator
+                content.append('| ' + ' | '.join(['---'] * len(table_data[0])) + ' |\n')
+                # Data rows
+                for row in table_data[1:]:
+                    content.append('| ' + ' | '.join(row) + ' |\n')
+                content.append('\n')
                 
     return ''.join(content)
 
-def get_text_from_paragraph(paragraph):
+def get_text_from_paragraph(paragraph, preserve_whitespace=False):
     """Extracts text content from a paragraph element."""
     text_elements = []
     
@@ -103,22 +168,32 @@ def get_text_from_paragraph(paragraph):
             text_run = element.get('textRun')
             if 'content' in text_run:
                 text = text_run.get('content')
+                if not preserve_whitespace:
+                    text = text.strip()
                 
                 # Apply text styling
                 text_style = text_run.get('textStyle', {})
                 
-                if text_style.get('bold'):
-                    text = f"**{text}**"
-                if text_style.get('italic'):
-                    text = f"_{text}_"
-                if text_style.get('strikethrough'):
-                    text = f"~~{text}~~"
-                if text_style.get('underline'):
-                    text = f"__{text}__"
+                # Only apply styling if there's actual content
+                if text.strip():
+                    if text_style.get('bold'):
+                        text = f"**{text}**"
+                    if text_style.get('italic'):
+                        text = f"_{text}_"
+                    if text_style.get('strikethrough'):
+                        text = f"~~{text}~~"
+                    if text_style.get('underline'):
+                        text = f"__{text}__"
+                    
+                    # Handle links
+                    if text_style.get('link'):
+                        url = text_style['link'].get('url', '')
+                        text = f"[{text}]({url})"
                 
                 text_elements.append(text)
     
-    return ''.join(text_elements).strip()
+    result = ''.join(text_elements)
+    return result if preserve_whitespace else result.strip()
 
 def main():
     """Main function to sync Google Doc to README."""
