@@ -17,13 +17,14 @@ To access the Zoho webhook please follow the below process:
    2. Your developers will be granted access to the Zoho Sandbox for testing  
 3. Use the Sandbox URL to test sending data to Zoho. Once you are satisfied with the results, email [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com) and a TELUS developer will validate your test data and provide you with the production webhook url.
 
-**Questions?**
+## **Questions?**
 
 * Technical inquiries can be sent to [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com)  
 * Non-technical or program related questions can be sent to [DLR-BOB@telus.com](mailto:DLR-BOB@telus.com)
 
-**How to Connect**  
-**Option \#1:** Connect Google Sheets directly with Zoho using Google App Scripts
+# **How to Connect**
+
+## **Option \#1: Connect Google Sheets directly with Zoho using Google App Scripts**
 
 - **Guide:** [Zoho | Google App Script + Google Sheet Webhook Setup Guide (Dealers)](https://docs.google.com/document/d/1kftsY9KZa27xBzZ7189bu1S2Fqd1bVfXec4VHZNlXcs/edit?tab=t.0#heading=h.wir9zfzf3130)  
 - **Templates:**   
@@ -32,7 +33,7 @@ To access the Zoho webhook please follow the below process:
   - [Send\_to\_webhook\_script.txt](https://drive.google.com/file/d/1asSxAyScKIMItP9uPccD7VJdqV2XZTPz/view?usp=drive_link)  
   - [create\_trigger\_script.txt](https://drive.google.com/file/d/1AD1lBP-FjldGDCq_XySFKLAMOvVlkc10/view?usp=drive_link)
 
-**Option \#2:** Connect Zapier with Zoho using a Webhook event type
+## **Option \#2: Connect Zapier with Zoho using a Webhook event type**
 
 - **Event type** \= POST  
 - **Sandbox URL:** https://sandbox.zohoapis.com/crm/v7/functions/telus\_webhook\_to\_capture\_lead/actions/execut e?auth\_type=apikey\&zapikey=1003.889f987039f9ee27f3c76f676263a8f4.5409f4070de428bf66 46fad109b33cc0  
