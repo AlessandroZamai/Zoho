@@ -10,7 +10,8 @@ from googleapiclient.discovery import build
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-SCOPES = ['https://www.googleapis.com/auth/documents.readonly', 'https://www.googleapis.com/auth/drive.readonly']
+# Update scopes to only include what's necessary
+SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
 
 def get_credentials():
     """Gets credentials using refresh token."""
