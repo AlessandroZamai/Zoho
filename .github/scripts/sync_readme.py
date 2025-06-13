@@ -5,13 +5,14 @@ import requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Update scopes to only include what's necessary
-SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
+# Update scopes to include both documents and drive readonly
+SCOPES = ['https://www.googleapis.com/auth/documents.readonly', 'https://www.googleapis.com/auth/drive.readonly']
 
 def get_credentials():
     """Gets credentials using refresh token."""
@@ -60,28 +61,20 @@ def get_credentials():
         logger.error(f"Error creating or refreshing credentials: {str(e)}")
         raise
 
-def download_as_markdown(document_id, credentials):
-    """Downloads the Google Doc as markdown using the export API."""
+def download_as_markdown(service, document_id):
+    """Downloads the Google Doc as markdown using the Drive API."""
     try:
-        # Build the export URL
-        export_url = f"https://docs.google.com/feeds/download/documents/export/Export?exportFormat=markdown&id={document_id}"
-        
-        # Get a fresh access token
-        request = Request()
-        credentials.refresh(request)
-        access_token = credentials.token
-        
-        # Make the request
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        response = requests.get(export_url, headers=headers)
-        response.raise_for_status()
-        
-        return response.text
-        
-    except Exception as e:
-        logger.error(f"Error downloading markdown: {str(e)}")
+        # First, get the file metadata to check permissions
+        file_metadata = service.files().get(fileId=document_id, fields="capabilities").execute()
+        if not file_metadata['capabilities']['canDownload']:
+            raise ValueError(f"The service account does not have permission to download the document with ID: {document_id}")
+
+        # If we have permission, proceed with the download
+        request = service.files().export_media(fileId=document_id, mimeType='text/markdown')
+        content = request.execute()
+        return content.decode('utf-8')
+    except HttpError as error:
+        logger.error(f'An error occurred: {error}')
         raise
 
 def main():
@@ -101,9 +94,18 @@ def main():
             logger.error(f"Error getting credentials: {str(e)}")
             raise
 
+        logger.info("Building service")
+        try:
+            service = build('drive', 'v3', credentials=credentials)
+            if not service:
+                raise ValueError("Failed to build service")
+        except Exception as e:
+            logger.error(f"Error building service: {str(e)}")
+            raise
+
         logger.info("Downloading markdown content")
         try:
-            markdown_content = download_as_markdown(document_id, credentials)
+            markdown_content = download_as_markdown(service, document_id)
             if not markdown_content:
                 raise ValueError("Failed to download markdown content")
         except Exception as e:
