@@ -1,9 +1,12 @@
-**Webhook Documentation**
+**Webhook Documentation
+**
 
-# **Purpose**
+# **Purpose
+**
 The Zoho webhook is designed to capture lead information and send it to Zoho CRM.
 
-# **Approval Process**
+# **Approval Process
+**
 To access the Zoho webhook please follow the below process:
 
 Contact the Book of Business team to request access to the Zoho webhook by submitting a request on the Book of Business Partners page.
@@ -18,18 +21,22 @@ Your developers will be granted access to the Zoho Sandbox for testing
 
 Use the Sandbox URL to test sending data to Zoho. Once you are satisfied with the results, email __dltrlzohodev@telus.com__ and a TELUS developer will validate your test data and provide you with the production webhook url.
 
-**Questions?**
+**Questions?
+**
 
 Technical inquiries can be sent to __dltrlzohodev@telus.com__
 
 Non-technical or program related questions can be sent to __DLR-BOB@telus.com__
 
-**How to Connect**
+**How to Connect
+**
 
 **Option #1: **Connect Google Sheets directly with Zoho using Google App Scripts
 
 **Guide: **
-**Templates: **
+
+**Templates: 
+**
 
 __Zoho _ Webhook Template + App Script.csv__
 
@@ -37,7 +44,8 @@ __Send_to_webhook_script.txt__
 
 __create_trigger_script.txt__
 
-**Option #2: **Connect Zapier with Zoho using a Webhook event type****
+**Option #2: **Connect Zapier with Zoho using a Webhook event type**
+**
 
 **Event type** = POST
 
@@ -47,14 +55,18 @@ __create_trigger_script.txt__
 
 **Mapping = **You must map your source data fields to the relevant **API Name **listed in the table below.
 
-# **API Parameters******
-## **Request Additional Fields**
+# **API Parameters****
+**
+## **Request Additional Fields
+**
 If you want to pass value to additional fields not outlined above, contact __dltrlzohodev@telus.com__.
 
-## **Request Body**
+## **Request Body
+**
 The request body should contain the lead information in JSON format.
 
-### **Example JSON Payload**
+### **Example JSON Payload
+**
 Test webhook json body:
 
 {
@@ -91,7 +103,8 @@ The request body should contain the lead information in JSON format.
 
 }
 
-# **Implementation Notes**
+# **Implementation Notes
+**
 Ensure the API key is securely stored and not exposed.
 
 Test the webhook thoroughly with various data inputs.
