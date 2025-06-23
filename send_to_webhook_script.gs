@@ -1,4 +1,4 @@
-const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.889f987039f9ee27f3c76f676263a8f4.5409f4070de428bf6646fad109b33cc0';
+const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.42d2b91107a5e07a82572cd07bf12057.3768451a4c228630723295f88c287bf8';
 
 // Replace with the auth token information TELUS provided you. If you do not have this, or have lost it, email dltrlzohodev@telus.com
 const AUTH_TOKEN_NAME = 'EnterAuthTokenName'; //Fill in this field with the token name you were provided
@@ -107,6 +107,18 @@ function sendToWebhook(e) {
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
     Logger.log('Webhook response: ' + response.getContentText());
     Logger.log('Webhook response code: ' + response.getResponseCode());
+    
+    // Parse the response and extract the record ID
+    const responseData = JSON.parse(response.getContentText());
+    if (responseData && responseData.details && responseData.details.id) {
+      const recordId = responseData.details.id;
+      
+      // Update column 16 with the record ID
+      sheet.getRange(rowToProcess, 16).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+      Logger.log('Record ID ' + recordId + ' stored in column 16 of row ' + rowToProcess);
+    } else {
+      Logger.log('Record ID not found in the response');
+    }
   } catch (error) {
     Logger.log('Error sending to webhook: ' + error.toString());
   }
