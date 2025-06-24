@@ -32,6 +32,14 @@ function sendToWebhook(e) {
   const lastRow = sheet.getLastRow();
   Logger.log('Active Sheet: ' + sheet.getName());
   Logger.log('Last row in sheet: ' + lastRow);
+  
+  // Check if this row has already been processed (has a Record ID in column 17)
+  const rowToProcess = e.range.getLastRow();
+  const recordIdCell = sheet.getRange(rowToProcess, 17).getValue();
+  if (recordIdCell && recordIdCell.toString().trim() !== '') {
+    Logger.log('Row ' + rowToProcess + ' has already been processed (Record ID found in column 17). Ignoring.');
+    return;
+  }
 
   // Get data from the last row where the edit occurred
   // It's usually better to use e.range.getRow() instead of lastRow to get the *edited* row's data
@@ -40,7 +48,6 @@ function sendToWebhook(e) {
   // If a single cell edit in a new row triggers this, lastRow might be correct.
   // However, if an existing row is edited, lastRow would get the bottom-most row.
   // For new row additions, e.range.getRow() would be the new last row.
-  const rowToProcess = e.range.getLastRow();
   const data = sheet.getRange(rowToProcess, 1, 1, sheet.getLastColumn()).getValues()[0];
   Logger.log('Data retrieved from row ' + rowToProcess + ': ' + JSON.stringify(data));
 
@@ -111,12 +118,23 @@ function sendToWebhook(e) {
     
     // Parse the response and extract the record ID
     const responseData = JSON.parse(response.getContentText());
+    const responseText = response.getContentText();
+    
+    // Store the full API response in column 19
+    sheet.getRange(rowToProcess, 19).setValue(responseText);
+    Logger.log('API response stored in column 19 of row ' + rowToProcess);
+    
     if (responseData && responseData.details && responseData.details.id) {
       const recordId = responseData.details.id;
       
       // Update column 17 with the record ID
       sheet.getRange(rowToProcess, 17).setValue('https://crmsandbox.zoho.com/crm/zohoplayground/tab/Leads/' + recordId); //Change url to https://crm.zoho.com/crm/org820120607/tab/Leads/ after testing is completed
       Logger.log('Record ID ' + recordId + ' stored in column 17 of row ' + rowToProcess);
+      
+      // Store the current date and time in column 18
+      const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+      sheet.getRange(rowToProcess, 18).setValue(timestamp);
+      Logger.log('Timestamp ' + timestamp + ' stored in column 18 of row ' + rowToProcess);
     } else {
       Logger.log('Record ID not found in the response');
     }
