@@ -1,14 +1,16 @@
-const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.42d2b91107a5e07a82572cd07bf12057.3768451a4c228630723295f88c287bf8';
+const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.0b0bd5ee4807f6c6148d8a73715c0c38.025642d6a7b32dcb50f9eba2e49c4f60';
 
-// Replace with the auth token information TELUS provided you. If you do not have this, or have lost it, email dltrlzohodev@telus.com
-const AUTH_TOKEN_NAME = 'EnterAuthTokenName'; //Fill in this field with the token name you were provided
-const AUTH_TOKEN_VALUE = 'EnterAuthTokenValue'; //Fill in this field with the token value you were provided
+// ORGANIZAITON PLACEHOLDERS
+// Replace with the auth token information TELUS provided you and enter your Organization Code. If you don't have this information, email dltrlzohodev@telus.com
+const AUTH_TOKEN_NAME = 'EnterAuthTokenName'; // Fill in this field with the token name you were provided
+const AUTH_TOKEN_VALUE = 'EnterAuthTokenValue'; // Fill in this field with the token value you were provided
+const ORG__CODE = 'EnterOrganizationCode'; // // Fill in this field with your 4 or 5-digit organization code (remove leading zeros)
 
 function sendToWebhook(e) {
   Logger.log('sendToWebhook function started.');
   Logger.log('Event object (e): ' + JSON.stringify(e));
   
-  // Check if AUTH_TOKEN_NAME and AUTH_TOKEN_VALUE are set
+  // Check if PLACEHOLDER information has been changed
   if (AUTH_TOKEN_NAME === 'EnterAuthTokenName') {
     Logger.log('AUTH_TOKEN_NAME is not set. Please set it to the token name you were provided.');
     return;
@@ -17,6 +19,11 @@ function sendToWebhook(e) {
     Logger.log('AUTH_TOKEN_VALUE is not set. Please set it to the token value you were provided.');
     return;
   }
+  if (ORG__CODE === 'EnterOrganizationCode') {
+    Logger.log('ORG__CODE is not set. Please set it to your organizations 5-digit organizaiton code.');
+    return;
+  }
+  
   // This function will be triggered when a new row is added
   if (e && e.range && (e.range.getRow() == 1 || e.range.getRow() == 2)) { // Check for header row and example data row
     Logger.log('Header row or example data row change detected. Ignoring.');
@@ -67,7 +74,7 @@ function sendToWebhook(e) {
   // Clean phone of all symbols, spaces etc.
   const phone = String(data[2]).replace(/[^0-9+]/g, ''); // Retails only digits and '+' and assumes Phone is in the 3rd column
   Logger.log('Original Phone Data: ' + data[2] + ', Cleaned Phone: ' + phone);
-
+  
   // Prepare the payload using API Names from the documentation
   const payload = {
     auth_token_name: AUTH_TOKEN_NAME,
@@ -88,18 +95,18 @@ function sendToWebhook(e) {
     Phone_Model: data[13], // Assuming Device Model is in the 14th column
     Brand: data[14], // Assuming Current Provider is in the 15th column
     note: data[15], // Assuming Note is in the 16th column
-    Consent_to_Contact_Captured: true,
-    Created_By_Email: Session.getActiveUser().getEmail(),
-    Campaign_Start_Date: Utilities.formatDate(today, "GMT", "yyyy-MM-dd"),
-    Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd"),
-    SalesRepPin: "MBPS" // Enter the CPMS SalesRepPin of the user you want new leads assgined to
-    // AssignToSalesRepUserID: "5877708000011780014", // Enter the Zoho UserID of the user you want new leads assgined to. Email dltrlzohodev@telus.com if you do not know your 19 digit Zoho user ID number
+    OrgTypeCode: "DL", // Do not modify this field
+    Organization_Code: ORG__CODE, // Do not modify this field
+    Consent_to_Contact_Captured: true, // Do not modify this field
+    Created_By_Email: Session.getActiveUser().getEmail(), // Do not modify this field
+    Campaign_Start_Date: Utilities.formatDate(today, "GMT", "yyyy-MM-dd"), // Do not modify this field unless you want the Start Date to show something other than the current date
+    Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd"), // Do not modify this field. If you want to change the end date, refer to the "Calculate dates" code block above
+    SalesRepPin: "LDK8" // Enter the CPMS SalesRepPin of the user you want new leads assgined to
     // AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
-    // Add other fields as needed, using the API Names from the documentation
+    // To add other data fields, refer to the API Name column in our Github documentation https://github.com/AlessandroZ-TELUS/Zoho
   };
   Logger.log('Payload prepared: ' + JSON.stringify(payload));
-
-
+  
   // Send the payload to the webhook
   const options = {
     'method': 'POST',
@@ -107,39 +114,58 @@ function sendToWebhook(e) {
     'payload': JSON.stringify(payload),
     'muteHttpExceptions': true // Added for debugging full responses on errors
   };
-  Logger.log('Webhook URL: ' + WEBHOOK_URL);
-  Logger.log('Fetch options: ' + JSON.stringify(options));
-
+    Logger.log('Fetch options: ' + JSON.stringify(options));
 
   try {
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
-    Logger.log('Webhook response: ' + response.getContentText());
     Logger.log('Webhook response code: ' + response.getResponseCode());
+    Logger.log('Webhook response: ' + response.getContentText());
     
-    // Parse the response and extract the record ID
+    // Parse the response
     const responseData = JSON.parse(response.getContentText());
     const responseText = response.getContentText();
     
     // Store the full API response in column 19
     sheet.getRange(rowToProcess, 19).setValue(responseText);
     Logger.log('API response stored in column 19 of row ' + rowToProcess);
+     
+    // Simple check for both 'data' and 'SUCCESS' in the response
+    let recordId = null;
     
-    if (responseData && responseData.details && responseData.details.id) {
-      const recordId = responseData.details.id;
-      
-      // Update column 17 with the record ID
+    try {
+      if (responseData && responseData.details && responseData.details.output) {
+        // Parse the output field which is a stringified JSON
+        const outputData = JSON.parse(responseData.details.output);
+        
+        // Check if data array exists and contains a SUCCESS code
+        if (outputData.data && Array.isArray(outputData.data) && outputData.data.length > 0 && 
+            outputData.data[0].code === "SUCCESS" && outputData.data[0].details && outputData.data[0].details.id) {
+          
+          // Extract the correct record ID from the nested structure
+          recordId = outputData.data[0].details.id;
+          Logger.log('Found correct record ID in response: ' + recordId);
+        }
+      }
+    } catch (parseError) {
+      Logger.log('Error parsing output JSON: ' + parseError.toString());
+    }
+    
+    if (recordId) {
+      // Update record ID column in Google Sheet
       sheet.getRange(rowToProcess, 17).setValue('https://crmsandbox.zoho.com/crm/zohoplayground/tab/Leads/' + recordId); //Change url to https://crm.zoho.com/crm/org820120607/tab/Leads/ after testing is completed
-      Logger.log('Record ID ' + recordId + ' stored in column 17 of row ' + rowToProcess);
+      Logger.log('Record ID: ' + recordId + ' stored on row ' + rowToProcess);
       
       // Store the current date and time in column 18
       const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
       sheet.getRange(rowToProcess, 18).setValue(timestamp);
-      Logger.log('Timestamp ' + timestamp + ' stored in column 18 of row ' + rowToProcess);
+      Logger.log('Timestamp: ' + timestamp + ' stored on row ' + rowToProcess);
+      Logger.log('SUCCESS: Lead successfully sent to Zoho');
     } else {
-      Logger.log('Record ID not found in the response');
+      Logger.log('FAILED: Request did not complete as no data was found in the reponse');
     }
   } catch (error) {
-    Logger.log('Error sending to webhook: ' + error.toString());
+    Logger.log('FAILED: Error sending to webhook. Error message ' + error.toString());
+    Logger.log('Error message: ' + error.toString());
   }
   Logger.log('sendToWebhook function finished.');
 }
