@@ -18,8 +18,8 @@ function sendToWebhook(e) {
     return;
   }
   // This function will be triggered when a new row is added
-  if (e && e.range && e.range.getRow() == 1) { // Added e.range check for robustness
-    Logger.log('Header row change detected. Ignoring.');
+  if (e && e.range && (e.range.getRow() == 1 || e.range.getRow() == 2)) { // Check for header row and example data row
+    Logger.log('Header row or example data row change detected. Ignoring.');
     return;
   }
   if (!e || !e.range) {
@@ -68,18 +68,19 @@ function sendToWebhook(e) {
     First_Name: data[0], // Assuming First Name is in the 1st column
     Last_Name: data[1], // Assuming Last Name is in the 2nd column
     Phone: phone, // Uses cleaned phone from above variable and assumes Phone is in the 3rd column
-    Datahub_Src: data[3], // Assuming Datahub_Src is in the 4th column
-    Campaign_Name: data[4], // Assuming Phone is in the 5th column
-    Description: data[5], //Assuming Description is in the 6th column
-    Street: data[6], //Assuming Street is in the 7th column
-    City: data[7], //Assuming City is in the 8th column
-    State: data[8], //Assuming Province is in the 9th column
-    Zip_Code: data[9], //Assuming Postal Code is in the 10th column
-    Country: data[10], //Assuming Country is in the 11th column
-    Rate_Plan_Description: data[11], //Assuming Rate Plan Description is in the 12th column
-    Phone_Model: data[12], //Assuming Device Model is in the 13th column
-    Brand: data[13], //Assuming Current Provider is in the 14th column
-    note: data[14], //Assuming Note is in the 15th column
+    Email: data[3], // Assuming Email is in the 4th column
+    Datahub_Src: data[4], // Assuming Datahub_Src is in the 5th column
+    Campaign_Name: data[5], // Assuming Campaign_Name is in the 6th column
+    Description: data[6], // Assuming Description is in the 7th column
+    Street: data[7], // Assuming Street is in the 8th column
+    City: data[8], // Assuming City is in the 9th column
+    State: data[9], // Assuming Province is in the 10th column
+    Zip_Code: data[10], // Assuming Postal Code is in the 11th column
+    Country: data[11], // Assuming Country is in the 12th column
+    Rate_Plan_Description: data[12], // Assuming Rate Plan Description is in the 13th column
+    Phone_Model: data[13], // Assuming Device Model is in the 14th column
+    Brand: data[14], // Assuming Current Provider is in the 15th column
+    note: data[15], // Assuming Note is in the 16th column
     Consent_to_Contact_Captured: true,
     Created_By_Email: Session.getActiveUser().getEmail(),
     Campaign_Start_Date: Utilities.formatDate(today, "GMT", "yyyy-MM-dd"),
@@ -113,9 +114,9 @@ function sendToWebhook(e) {
     if (responseData && responseData.details && responseData.details.id) {
       const recordId = responseData.details.id;
       
-      // Update column 16 with the record ID
-      sheet.getRange(rowToProcess, 16).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
-      Logger.log('Record ID ' + recordId + ' stored in column 16 of row ' + rowToProcess);
+      // Update column 17 with the record ID
+      sheet.getRange(rowToProcess, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+      Logger.log('Record ID ' + recordId + ' stored in column 17 of row ' + rowToProcess);
     } else {
       Logger.log('Record ID not found in the response');
     }
