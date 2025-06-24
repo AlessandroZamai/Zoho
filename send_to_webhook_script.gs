@@ -115,7 +115,7 @@ function sendToWebhook(e) {
       const recordId = responseData.details.id;
       
       // Update column 17 with the record ID
-      sheet.getRange(rowToProcess, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+      sheet.getRange(rowToProcess, 17).setValue('https://crmsandbox.zoho.com/crm/zohoplayground/tab/Leads/' + recordId); //Change url to https://crm.zoho.com/crm/org820120607/tab/Leads/ after testing is completed
       Logger.log('Record ID ' + recordId + ' stored in column 17 of row ' + rowToProcess);
     } else {
       Logger.log('Record ID not found in the response');
