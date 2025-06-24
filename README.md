@@ -53,6 +53,8 @@ To access the Zoho webhook please follow the below process:
 | Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Quote Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
 | Campaign\_Name | Campaign\_Name |  | Yes |
+| OrgTypeCode | OrgTypeCode | The values would be KI, DL, RT.KI \= CorporateDL \= DealerRT \= Mobile Klinik | Yes |
+| Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
 | Street | Street |  | No |
 | City | City |  | No |
 | Province | State |  | No |
