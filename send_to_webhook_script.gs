@@ -124,12 +124,8 @@ function sendToWebhook(e) {
     // Parse the response
     const responseData = JSON.parse(response.getContentText());
     const responseText = response.getContentText();
-    
-    // Store the full API response in column 19
-    sheet.getRange(rowToProcess, 19).setValue(responseText);
-    Logger.log('API response stored in column 19 of row ' + rowToProcess);
      
-    // Simple check for both 'data' and 'SUCCESS' in the response
+    // Check if 'data' and 'SUCCESS' is in the webhook response
     let recordId = null;
     
     try {
@@ -143,7 +139,6 @@ function sendToWebhook(e) {
           
           // Extract the correct record ID from the nested structure
           recordId = outputData.data[0].details.id;
-          Logger.log('Found correct record ID in response: ' + recordId);
         }
       }
     } catch (parseError) {
