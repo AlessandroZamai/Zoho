@@ -20,7 +20,7 @@ function sendToWebhook(e) {
     return;
   }
   if (ORG__CODE === 'EnterOrganizationCode') {
-    Logger.log('ORG__CODE is not set. Please set it to your organizations 5-digit organizaiton code.');
+    Logger.log('ORG__CODE is not set. Please set it to your organization\'s 5-digit organization code.');
     return;
   }
   
@@ -72,7 +72,7 @@ function sendToWebhook(e) {
   Logger.log('Today: ' + today.toISOString() + ', End Date: ' + endDate.toISOString() + ', Days between: ' + diffDays);
 
   // Clean phone of all symbols, spaces etc.
-  const phone = String(data[2]).replace(/[^0-9+]/g, ''); // Retails only digits and '+' and assumes Phone is in the 3rd column
+  const phone = String(data[2]).replace(/[^0-9+]/g, ''); // Retains only digits and '+' and assumes Phone is in the 3rd column
   Logger.log('Original Phone Data: ' + data[2] + ', Cleaned Phone: ' + phone);
   
   // Prepare the payload using API Names from the documentation
@@ -95,6 +95,7 @@ function sendToWebhook(e) {
     Phone_Model: data[13], // Assuming Device Model is in the 14th column
     Brand: data[14], // Assuming Current Provider is in the 15th column
     note: data[15], // Assuming Note is in the 16th column
+    notify_record_owner: true, // To control this from a column in your spreadsheet, change true to data[##] and enter the reference column # (e.g. data[16] for column 17)
     OrgTypeCode: "DL", // Do not modify this field
     Organization_Code: ORG__CODE, // Do not modify this field
     Consent_to_Contact_Captured: true, // Do not modify this field
@@ -156,7 +157,7 @@ function sendToWebhook(e) {
       Logger.log('Timestamp: ' + timestamp + ' stored on row ' + rowToProcess);
       Logger.log('SUCCESS: Lead successfully sent to Zoho');
     } else {
-      Logger.log('FAILED: Request did not complete as no data was found in the reponse');
+      Logger.log('FAILED: Request did not complete as no data was found in the response');
     }
   } catch (error) {
     Logger.log('FAILED: Error sending to webhook. Error message ' + error.toString());
