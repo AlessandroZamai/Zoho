@@ -112,15 +112,15 @@ def main():
             logger.error(f"Error downloading markdown: {str(e)}")
             raise
 
-        logger.info("Writing to README.md")
+        logger.info("Writing to APP_SCRIPT_GUIDE.md")
         try:
-            with open('README.md', 'w', encoding='utf-8') as f:
+            with open('APP_SCRIPT_GUIDE.md', 'w', encoding='utf-8') as f:
                 f.write(markdown_content)
         except Exception as e:
-            logger.error(f"Error writing to README.md: {str(e)}")
+            logger.error(f"Error writing to APP_SCRIPT_GUIDE.md: {str(e)}")
             raise
 
-        logger.info("Successfully updated README.md")
+        logger.info("Successfully updated APP_SCRIPT_GUIDE.md")
 
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}")
