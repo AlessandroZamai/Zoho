@@ -7,8 +7,8 @@ This document provides step-by-step instructions for partners to set up the Goog
 Before you begin, ensure you have:
 
 * A Google account with access to Google Sheets and Google Apps Script.  
-* The `Webhook Sample Template w_Script.xlsx - Sheet1.csv` file.  
-* The `create_trigger_script.gs` and `send_to_webhook_script.gs` files containing the Google Apps Script code.  
+* The `Zoho_Webhook_Template_App_Script.csv` file  
+* The `create_trigger_script.gs` and `send_to_webhook_script.gs` files containing the code you will be adding to Google Apps Script  
 * Your unique Zoho API `AUTH_TOKEN_NAME` and `AUTH_TOKEN_VALUE` provided by TELUS. If you do not have this, or have lost it, email `dltrlzohodev@telus.com`.
 
 ## **Step 1: Create a New Google Spreadsheet and Import the Template**
@@ -19,7 +19,7 @@ Before you begin, ensure you have:
 4. **Import the CSV Template:**  
    * Go to `File > Import`.  
    * Select the `Upload` tab.  
-   * Click `Browse` and select the `Webhook Sample Template w_Script.csv` file that was shared with you.  
+   * Click `Browse` and select the `Zoho_Webhook_Template_App_Script.csv` file that was shared with you.  
    * In the Import options, choose:  
      * **Import location:** `Replace spreadsheet` (this will replace the blank sheet with the template data).  
      * **Separator type:** `Detect automatically`.  
@@ -48,7 +48,7 @@ Before you begin, ensure you have:
 
 ## **Step 3: Update the Script with Your Unique API Token and Sales Rep Assignment**
 
-1. **Locate `sendToWebhook` function:** In the Apps Script editor, open the `Code.gs` file.  
+1. **Locate the `sendToWebhook` function:** In the Apps Script editor, open the `Code.gs` file.  
 2. **Update API Tokens:**  
    * Locate the line:
 
@@ -71,8 +71,7 @@ const AUTH_TOKEN_NAME = 'dealerName_token';
 const AUTH_TOKEN_VALUE = 'asdFweF234Asdfhg234kjlaSdf';
 ```
 
-4.   
-   **Configure Sales Rep Assignment:** In the `payload` section of the `sendToWebhook` function, you will see fields related to assigning the lead to a sales representative. You need to **choose ONE** of the following methods for lead assignment. The other methods should remain commented out (`//` at the beginning of the line).  
+4. **Configure Sales Rep Assignment:** In the `payload` section of the `sendToWebhook` function, you will see fields related to assigning the lead to a sales representative. You need to **choose ONE** of the following methods for lead assignment. The other methods should remain commented out (`//` at the beginning of the line).  
    * **Option A: Using Sales Rep Pin (Recommended Default)**  
      * Locate the line:
 
@@ -132,7 +131,7 @@ AssignToSalesRepEmail: "salesrep@yourdomain.com", // Enter the email address of 
 
 This step will set up the automatic sending of data when a new row is added or an existing row is edited in your spreadsheet.
 
-1. **Open** `createTrigger.gs`**:** In the Apps Script editor, open the `createTrigger.gs` file.  
+1. **Open** **`createTrigger.gs`:** In the Apps Script editor, open the `createTrigger.gs` file.  
 2. **Run `createTrigger` Function:**  
    * In the toolbar, next to the "Run" button, there's a dropdown menu (it might say `(no function selected)` or `createTrigger`). Select `createTrigger` from this dropdown.  
    * Click the `Run` button (looks like a play icon).  
@@ -148,7 +147,7 @@ This step will set up the automatic sending of data when a new row is added or a
 
 ## **Step 5: Test the Webhook Integration**
 
-1. **Go to Your Google Spreadsheet:** Open the Google Sheet where you imported the template.  
+1. **Go to your Google Spreadsheet:** Open the Google Sheet where you imported the template.  
 2. **Add a New Row of Data:** In the spreadsheet, go to the last empty row and start entering data. Fill in at least the required fields (First Name, Last Name, Phone, Consent to Contact, Created By Email, Campaign Start Date, Campaign End Date, Campaign Name, Datahub Src).  
 3. **Trigger the Webhook:** As you type and move out of the last cell in the row (e.g., by pressing Enter or clicking elsewhere), the `onEdit` trigger will fire, and the `sendToWebhook` function will attempt to send the data to Zoho.  
 4. **Check Apps Script Logs for Success/Errors:**  
@@ -162,7 +161,8 @@ This step will set up the automatic sending of data when a new row is added or a
      * The webhook URL and options.  
      * Crucially, a `Webhook response:` line. If successful, you should see Zoho's "success" message. If there's an error, the logs will show the detailed error response from Zoho, helping you troubleshoot further.  
 5. **Example of a successful log line:** `Webhook response: {"code":"success","details":{"output":"{\"data\":[{\"code\":\"SUCCESS\"}]}", ... }`  
-6. **Verify in Zoho CRM:** Check your Zoho CRM instance to confirm that a new lead has been created with the data you entered in the spreadsheet.
+6. **Check that a link to the Lead was added to your spreadsheet**  
+7. **Verify in Zoho CRM:** Check your Zoho CRM instance to confirm that a new lead has been created with the data you entered in the spreadsheet.
 
 If you encounter any errors in the Apps Script logs, review the messages carefully. They often provide clues on what needs to be adjusted in your spreadsheet data or Zoho configuration.
 
