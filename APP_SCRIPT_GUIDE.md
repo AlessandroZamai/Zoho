@@ -8,7 +8,7 @@ Before you begin, ensure you have:
 
 * A Google account with access to Google Sheets and Google Apps Script.  
 * The `Webhook Sample Template w_Script.xlsx - Sheet1.csv` file.  
-* The `create_trigger_script.txt` and `send_to_webhook_script.txt` files containing the Google Apps Script code.  
+* The `create_trigger_script.gs` and `send_to_webhook_script.gs` files containing the Google Apps Script code.  
 * Your unique Zoho API `AUTH_TOKEN_NAME` and `AUTH_TOKEN_VALUE` provided by TELUS. If you do not have this, or have lost it, email `dltrlzohodev@telus.com`.
 
 ## **Step 1: Create a New Google Spreadsheet and Import the Template**
@@ -34,14 +34,14 @@ Before you begin, ensure you have:
    * In the Apps Script editor, click on `+` next to "Files" (or `File > New > Script file`).  
    * Name the new file `sendToWebhook.gs` (or any other descriptive name).  
    * Delete all the content within `sendToWebhook.gs`  
-   * Open the `send_to_webhook_script.txt` file you received in a text editor.  
+   * Open the `send_to_webhook_script.gs` file you received in a text editor.  
    * Copy **all** the content from this file.  
    * Paste it into the `Code.gs` file in the Apps Script editor.  
 4. **Add `createTrigger` Script:**  
    * In the Apps Script editor, click on `+` next to "Files" (or `File > New > Script file`).  
    * Delete all the content within `createTrigger.gs`  
    * Name the new file `createTrigger.gs` (or any other descriptive name).  
-   * Open the `create_trigger_script.txt` file you received in a text editor.  
+   * Open the `create_trigger_script.gs` file you received in a text editor.  
    * Copy **all** the content from this file.  
    * Paste it into the newly created `createTrigger.gs` file.  
 5. **Save the Project:** Click the `Save project` icon (looks like a floppy disk) in the Apps Script editor.

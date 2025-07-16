@@ -1,1 +1,1 @@
-First_Name,Last_Name,Phone,Datahub_Src,Campaign_Name,Description,Street,City,State,Zip_Code,Country,Rate_Plan_Description,Phone_Model,Current Provider,Note
+First_Name,Last_Name,Phone,Email,Datahub_Src,Campaign_Name,Description,Street,City,State,Zip_Code,Country,Rate_Plan_Description,Phone_Model,Current_Provider,Note,Zoho_Record_URL,Time_Created_in_Zoho

@@ -104,7 +104,7 @@ function sendToWebhook(e) {
     Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd"), // Do not modify this field. If you want to change the end date, refer to the "Calculate dates" code block above
     SalesRepPin: "LDK8" // Enter the CPMS SalesRepPin of the user you want new leads assgined to
     // AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
-    // To add other data fields, refer to the API Name column in our Github documentation https://github.com/AlessandroZ-TELUS/Zoho
+    // To add other data fields, refer to the API Name column in our Github documentation https://github.com/AlessandroZamai/Zoho
   };
   Logger.log('Payload prepared: ' + JSON.stringify(payload));
   
