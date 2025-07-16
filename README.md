@@ -27,9 +27,9 @@ To access the Zoho webhook please follow the below process:
 - **Guide:** [Zoho | Google App Script + Google Sheet Webhook Setup Guide (Dealers)](https://docs.google.com/document/d/1kftsY9KZa27xBzZ7189bu1S2Fqd1bVfXec4VHZNlXcs/edit?tab=t.0#heading=h.wir9zfzf3130)  
 - **Templates:**   
   - [Webhook Sample Template w/Script](https://docs.google.com/spreadsheets/d/1oeYnSNhvaDGVlSK48T_nllv7_U6oIXymqC2oxL80mYo/edit?gid=0#gid=0)  
-  - [Zoho \_ Webhook Template \+ App Script.csv](https://drive.google.com/file/d/17m3S7mPBBx7qA6Nh4BxPFuxwxYAJfv1G/view?usp=drive_link)  
-  - [Send\_to\_webhook\_script.txt](https://drive.google.com/file/d/1asSxAyScKIMItP9uPccD7VJdqV2XZTPz/view?usp=drive_link)  
-  - [create\_trigger\_script.txt](https://drive.google.com/file/d/1AD1lBP-FjldGDCq_XySFKLAMOvVlkc10/view?usp=drive_link)
+  - [Zoho \_ Webhook Template \+ App Script.csv](https://github.com/AlessandroZamai/Zoho/blob/main/Zoho_Webhook_Template_App_Script.csv)  
+  - [Send\_to\_webhook\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/send_to_webhook_script.gs)  
+  - [create\_trigger\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/create_trigger_script.gs)
 
 ## **Option \#2: Connect Zapier with Zoho using a Webhook event type**
 
