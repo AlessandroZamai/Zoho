@@ -68,6 +68,7 @@ To access the Zoho webhook please follow the below process:
 | notify\_record\_owner | notify\_record\_owner | Pass boolean “true” to send email notification on lead creation to record owner | No |
 | share\_with\_other\_users | share\_with\_other\_users | Pass boolean “true” to share records with other peers. Only for KI and RT. | No |
 | notify\_share\_with\_other\_users | notify\_share\_with\_other\_users | Pass boolean “true” to send email notification to all peer with whom the record is shared. | No |
+| custom\_email\_notify\_list | custom\_email\_notify\_list | Pass custom email address separated by comma to notify them | No |
 | **CORPORATE STORES** |  |  |  |
 | AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
