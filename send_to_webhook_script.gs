@@ -1,4 +1,4 @@
-const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.0b0bd5ee4807f6c6148d8a73715c0c38.025642d6a7b32dcb50f9eba2e49c4f60';
+const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f';
 
 // ORGANIZAITON PLACEHOLDERS
 // Replace with the auth token information TELUS provided you and enter your Organization Code. If you don't have this information, email dltrlzohodev@telus.com
