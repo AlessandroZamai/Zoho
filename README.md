@@ -4,7 +4,7 @@
 
 The Zoho webhook is designed to capture lead information and send it to Zoho CRM.
 
-# **Approval Process**
+# **Dealer \- Approval Process**
 
 To access the Zoho webhook please follow the below process:
 
@@ -20,7 +20,7 @@ To access the Zoho webhook please follow the below process:
 * Technical inquiries can be sent to [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com)  
 * Non-technical or program related questions can be sent to [DLR-BOB@telus.com](mailto:DLR-BOB@telus.com)
 
-# **How to Connect**
+# **Dealers \- How to Connect**
 
 ## **Option \#1: Connect Google Sheets directly with Zoho using Google App Scripts**
 
@@ -35,11 +35,11 @@ To access the Zoho webhook please follow the below process:
 
 ## **Option \#2: Write your own code, or use a no-code platform like Zapier, N8N, or Zoho Flow**
 
-- **Zapier event type \= (Webhook event type connector**  
+- **Zapier event type** \= Webhook event type connector  
 - **Event type** \= POST  
-- **Sandbox URL:** [https://sandbox.zohoapis.com/crm/v7/functions/telus\_webhook\_to\_capture\_lead/actions/execute?auth\_type=apikey\&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f](https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f)  
+- **Sandbox URL** \= Enter URL provided by TELUS team once request has been approved  
 - **Payload type** \= json  
-- **Mapping \=** You must map your source data fields to the relevant **API Name** listed in the table below.
+- **Mapping** \= You must map your source data fields to the relevant **API Name** listed in the table below.
 
 # **API Parameters**
 
