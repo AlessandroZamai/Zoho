@@ -15,13 +15,20 @@ The current focus is on setting up and documenting the Zoho webhook integration 
    - Added logging for better troubleshooting
    - Improved phone number formatting to ensure compliance with API requirements
    - Added record ID and timestamp tracking for successful submissions
+   - **FIXED**: Webhook response parsing logic to correctly extract record ID and timestamp from Zoho API response
 
-2. **Documentation**:
+2. **Bug Fix - Webhook Response Parsing**:
+   - Issue: Script was looking for record ID in `responseData.details.output` structure that didn't exist
+   - Actual response structure: `responseData.data[0].details.id`
+   - Solution: Updated parsing logic to match actual Zoho webhook response format
+   - Result: Record ID and timestamp now properly stored in Google Sheet columns 17 and 18
+
+3. **Documentation**:
    - Created comprehensive README with webhook details and API parameters
    - Documented the approval process for partners
    - Added example JSON payload for testing
 
-3. **Process Improvements**:
+4. **Process Improvements**:
    - Established a clear workflow for sandbox testing and production transition
    - Created email templates for partner communication
    - Set up support channels for technical and non-technical inquiries

@@ -130,20 +130,18 @@ function sendToWebhook(e) {
     let recordId = null;
     
     try {
-      if (responseData && responseData.details && responseData.details.output) {
-        // Parse the output field which is a stringified JSON
-        const outputData = JSON.parse(responseData.details.output);
+      // Check if data array exists and contains a SUCCESS code
+      if (responseData && responseData.data && Array.isArray(responseData.data) && responseData.data.length > 0 && 
+          responseData.data[0].code === "SUCCESS" && responseData.data[0].details && responseData.data[0].details.id) {
         
-        // Check if data array exists and contains a SUCCESS code
-        if (outputData.data && Array.isArray(outputData.data) && outputData.data.length > 0 && 
-            outputData.data[0].code === "SUCCESS" && outputData.data[0].details && outputData.data[0].details.id) {
-          
-          // Extract the correct record ID from the nested structure
-          recordId = outputData.data[0].details.id;
-        }
+        // Extract the record ID from the response structure
+        recordId = responseData.data[0].details.id;
+        Logger.log('Record ID extracted from response: ' + recordId);
+      } else {
+        Logger.log('Response structure check failed. ResponseData: ' + JSON.stringify(responseData));
       }
     } catch (parseError) {
-      Logger.log('Error parsing output JSON: ' + parseError.toString());
+      Logger.log('Error parsing response JSON: ' + parseError.toString());
     }
     
     if (recordId) {
