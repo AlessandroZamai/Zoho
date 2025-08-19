@@ -60,16 +60,16 @@ function sendToWebhook(e) {
 
 
   // Calculate dates
-  const today = new Date();
-  const endDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days later
-  Logger.log('Today: ' + today.toISOString() + ', End Date (30 days later): ' + endDate.toISOString());
-
+  const startDate = new Date();
+  const campaign_length = 30 // Sets end date 30 days after today. Change value to adjust end date
+  const endDate = new Date(today.getTime() + campaign_length * 24 * 60 * 60 * 1000); 
+  
   // Calculate the number of days between today and endDate
   const diffTime = Math.abs(endDate.getTime() - today.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   // Modified Logger.log line
-  Logger.log('Today: ' + today.toISOString() + ', End Date: ' + endDate.toISOString() + ', Days between: ' + diffDays);
+  Logger.log('Start Date: ' + today.toISOString() + ', End Date: ' + endDate.toISOString() + ', Days between: ' + diffDays);
 
   // Clean phone of all symbols, spaces etc.
   const phone = String(data[2]).replace(/[^0-9+]/g, ''); // Retains only digits and '+' and assumes Phone is in the 3rd column
@@ -100,7 +100,7 @@ function sendToWebhook(e) {
     Organization_Code: ORG__CODE, // Do not modify this field
     Consent_to_Contact_Captured: true, // Do not modify this field
     Created_By_Email: Session.getActiveUser().getEmail(), // Do not modify this field
-    Campaign_Start_Date: Utilities.formatDate(today, "GMT", "yyyy-MM-dd"), // Do not modify this field unless you want the Start Date to show something other than the current date
+    Campaign_Start_Date: Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd"), // Do not modify this field unless you want the Start Date to show something other than the current date
     Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd"), // Do not modify this field. If you want to change the end date, refer to the "Calculate dates" code block above
     SalesRepPin: "LDK8" // Enter the CPMS SalesRepPin of the user you want new leads assgined to
     // AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
@@ -146,7 +146,7 @@ function sendToWebhook(e) {
     
     if (recordId) {
       // Update record ID column in Google Sheet
-      sheet.getRange(rowToProcess, 17).setValue('https://crmsandbox.zoho.com/crm/zohoplayground/tab/Leads/' + recordId); //Change url to https://crm.zoho.com/crm/org820120607/tab/Leads/ after testing is completed
+      sheet.getRange(rowToProcess, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
       Logger.log('Record ID: ' + recordId + ' stored on row ' + rowToProcess);
       
       // Store the current date and time in column 18
