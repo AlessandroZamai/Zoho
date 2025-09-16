@@ -54,7 +54,7 @@ To access the Zoho webhook please follow the below process:
 | Created By Email | Created\_By\_Email | Individual responsible for data source that TELUS can contact | Yes |
 | Campaign Start Date | Campaign\_Start\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
-| Quote Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
+| Data\_Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
 | Campaign\_Name | Campaign\_Name |  | Yes |
 | OrgTypeCode | OrgTypeCode | The values would be KI, DL, RT.KI \= CorporateDL \= DealerRT \= Mobile Klinik | Yes |
 | Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
@@ -79,7 +79,7 @@ To access the Zoho webhook please follow the below process:
 | ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
 | OutletId | OutletId |  |  |
 | **DEALERS** |  |  |  |
-| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. HOW TO ASSIGN TO DEALER ADMIN |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
 | AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
 | **MobileKlinik** |  |  |  |
