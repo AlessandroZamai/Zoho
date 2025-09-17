@@ -79,7 +79,7 @@ To access the Zoho webhook please follow the below process:
 | ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
 | OutletId | OutletId |  |  |
 | **DEALERS** |  |  |  |
-| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. HOW TO ASSIGN TO DEALER ADMIN |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. If user is not found, record will be assigned to Dealer Admin |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
 | AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
 | **MobileKlinik** |  |  |  |
