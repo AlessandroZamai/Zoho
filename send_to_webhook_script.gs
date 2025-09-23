@@ -10,17 +10,26 @@ function sendToWebhook(e) {
   Logger.log('sendToWebhook function started.');
   Logger.log('Event object (e): ' + JSON.stringify(e));
   
-  // Check if PLACEHOLDER information has been changed
-  if (AUTH_TOKEN_NAME === 'EnterAuthTokenName') {
-    Logger.log('AUTH_TOKEN_NAME is not set. Please set it to the token name you were provided.');
+  // Check if we're in automated mode
+  const currentMode = getCurrentProcessingMode();
+  if (currentMode !== PROCESSING_MODE_AUTO) {
+    Logger.log('Not in automated mode. Exiting.');
     return;
   }
-  if (AUTH_TOKEN_VALUE === 'EnterAuthTokenValue') {
-    Logger.log('AUTH_TOKEN_VALUE is not set. Please set it to the token value you were provided.');
+  
+  // Get configuration values
+  const config = getConfigurationValues();
+  
+  // Check if configuration is complete
+  const configCheck = isConfigurationComplete();
+  if (!configCheck.complete) {
+    Logger.log('Configuration incomplete: ' + configCheck.message);
     return;
   }
-  if (ORG__CODE === 'EnterOrganizationCode') {
-    Logger.log('ORG__CODE is not set. Please set it to your organization\'s 5-digit organization code.');
+  
+  // Check if processing mode is set
+  if (!config.processingMode) {
+    Logger.log('Processing mode not set');
     return;
   }
   
@@ -40,12 +49,28 @@ function sendToWebhook(e) {
   Logger.log('Active Sheet: ' + sheet.getName());
   Logger.log('Last row in sheet: ' + lastRow);
   
-  // Check if this row has already been processed (has a Record ID in column 17)
+  // Check if this row has already been processed (has a Record ID in column 19)
   const rowToProcess = e.range.getLastRow();
-  const recordIdCell = sheet.getRange(rowToProcess, 17).getValue();
+  const recordIdCell = sheet.getRange(rowToProcess, 19).getValue();
   if (recordIdCell && recordIdCell.toString().trim() !== '') {
-    Logger.log('Row ' + rowToProcess + ' has already been processed (Record ID found in column 17). Ignoring.');
+    Logger.log('Row ' + rowToProcess + ' has already been processed (Record ID found in column 19). Ignoring.');
     return;
+  }
+  
+  // Check if this row has disabled columns based on configuration
+  if (config.enabledColumns) {
+    const channelOutletId = sheet.getRange(rowToProcess, 17).getValue();
+    const salesRepEmail = sheet.getRange(rowToProcess, 18).getValue();
+    
+    // If a disabled column has data, ignore the edit
+    if (!config.enabledColumns.channelOutletId && channelOutletId) {
+      Logger.log('Row ' + rowToProcess + ' has data in disabled ChannelOutletID column. Ignoring.');
+      return;
+    }
+    if (!config.enabledColumns.assignToSalesRepEmail && salesRepEmail) {
+      Logger.log('Row ' + rowToProcess + ' has data in disabled AssigntoSalesRepEmail column. Ignoring.');
+      return;
+    }
   }
 
   // Get data from the last row where the edit occurred
@@ -59,17 +84,19 @@ function sendToWebhook(e) {
   Logger.log('Data retrieved from row ' + rowToProcess + ': ' + JSON.stringify(data));
 
 
-  // Calculate dates
-  const startDate = new Date();
-  const campaign_length = 30 // Sets end date 30 days after today. Change value to adjust end date
-  const endDate = new Date(today.getTime() + campaign_length * 24 * 60 * 60 * 1000); 
+  // Use configured campaign dates or fallback to calculated dates
+  let startDate, endDate;
+  if (config.campaignStartDate && config.campaignEndDate) {
+    startDate = new Date(config.campaignStartDate);
+    endDate = new Date(config.campaignEndDate);
+  } else {
+    // Fallback to calculated dates for legacy configurations
+    startDate = new Date();
+    const campaign_length = 30;
+    endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
+  }
   
-  // Calculate the number of days between today and endDate
-  const diffTime = Math.abs(endDate.getTime() - today.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  // Modified Logger.log line
-  Logger.log('Start Date: ' + today.toISOString() + ', End Date: ' + endDate.toISOString() + ', Days between: ' + diffDays);
+  Logger.log('Campaign Start Date: ' + startDate.toISOString() + ', End Date: ' + endDate.toISOString());
 
   // Clean phone of all symbols, spaces etc.
   const phone = String(data[2]).replace(/[^0-9+]/g, ''); // Retains only digits and '+' and assumes Phone is in the 3rd column
@@ -77,35 +104,46 @@ function sendToWebhook(e) {
   
   // Prepare the payload using API Names from the documentation
   const payload = {
-    auth_token_name: AUTH_TOKEN_NAME,
-    auth_token_value: AUTH_TOKEN_VALUE,
-    First_Name: data[0], // Assuming First Name is in the 1st column
-    Last_Name: data[1], // Assuming Last Name is in the 2nd column
-    Phone: phone, // Uses cleaned phone from above variable and assumes Phone is in the 3rd column
-    Email: data[3], // Assuming Email is in the 4th column
-    Datahub_Src: data[4], // Assuming Datahub_Src is in the 5th column
-    Campaign_Name: data[5], // Assuming Campaign_Name is in the 6th column
-    Description: data[6], // Assuming Description is in the 7th column
-    Street: data[7], // Assuming Street is in the 8th column
-    City: data[8], // Assuming City is in the 9th column
-    State: data[9], // Assuming Province is in the 10th column
-    Zip_Code: data[10], // Assuming Postal Code is in the 11th column
-    Country: data[11], // Assuming Country is in the 12th column
-    Rate_Plan_Description: data[12], // Assuming Rate Plan Description is in the 13th column
-    Phone_Model: data[13], // Assuming Device Model is in the 14th column
-    Brand: data[14], // Assuming Current Provider is in the 15th column
-    note: data[15], // Assuming Note is in the 16th column
-    notify_record_owner: true, // To control this from a column in your spreadsheet, change true to data[##] and enter the reference column # (e.g. data[16] for column 17)
-    OrgTypeCode: "DL", // Do not modify this field
-    Organization_Code: ORG__CODE, // Do not modify this field
-    Consent_to_Contact_Captured: true, // Do not modify this field
-    Created_By_Email: Session.getActiveUser().getEmail(), // Do not modify this field
-    Campaign_Start_Date: Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd"), // Do not modify this field unless you want the Start Date to show something other than the current date
-    Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd"), // Do not modify this field. If you want to change the end date, refer to the "Calculate dates" code block above
-    SalesRepPin: "LDK8" // Enter the CPMS SalesRepPin of the user you want new leads assgined to
-    // AssignToSalesRepEmail: "example@email.com", // Enter the email address of the user you want new leads assigned to
-    // To add other data fields, refer to the API Name column in our Github documentation https://github.com/AlessandroZamai/Zoho
+    auth_token_name: config.authTokenName,
+    auth_token_value: config.authTokenValue,
+    First_Name: data[0], // First Name
+    Last_Name: data[1], // Last Name
+    Phone: phone, // Cleaned phone number
+    Email: data[3], // Email
+    Language_Preference: data[4], // Language Preference (new field)
+    Datahub_Src: data[5], // Datahub_Src
+    Campaign_Name: data[6], // Campaign_Name
+    Description: data[7], // Description
+    Street: data[8], // Street
+    City: data[9], // City
+    State: data[10], // State/Province
+    Zip_Code: data[11], // Postal Code
+    Country: data[12], // Country
+    Rate_Plan_Description: data[13], // Rate Plan Description
+    Phone_Model: data[14], // Device Model
+    Brand: data[15], // Current Provider
+    notify_record_owner: true,
+    OrgTypeCode: config.orgTypeCode,
+    Organization_Code: config.orgCode,
+    Consent_to_Contact_Captured: true,
+    Created_By_Email: Session.getActiveUser().getEmail(),
+    Campaign_Start_Date: Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd"),
+    Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
   };
+  
+  // Add assignment fields based on configuration
+  if (config.leadAssignment === ASSIGNMENT_EQUAL && config.enabledColumns.channelOutletId) {
+    // Use Channel Outlet ID for equal distribution
+    if (data[16] && data[16].toString().trim() !== '') {
+      payload.ChannelOutletId = data[16].toString().trim();
+    }
+  } else if (config.leadAssignment === ASSIGNMENT_MANUAL && config.enabledColumns.assignToSalesRepEmail) {
+    // Use sales rep email for manual assignment
+    if (data[17] && data[17].toString().trim() !== '') {
+      payload.AssignToSalesRepEmail = data[17].toString().trim();
+    }
+  }
+  // For ASSIGNMENT_ADMIN, no additional assignment fields are needed
   Logger.log('Payload prepared: ' + JSON.stringify(payload));
   
   // Send the payload to the webhook
@@ -145,13 +183,13 @@ function sendToWebhook(e) {
     }
     
     if (recordId) {
-      // Update record ID column in Google Sheet
-      sheet.getRange(rowToProcess, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+      // Update record ID column in Google Sheet (column 19)
+      sheet.getRange(rowToProcess, 19).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
       Logger.log('Record ID: ' + recordId + ' stored on row ' + rowToProcess);
       
-      // Store the current date and time in column 18
+      // Store the current date and time in column 20
       const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-      sheet.getRange(rowToProcess, 18).setValue(timestamp);
+      sheet.getRange(rowToProcess, 20).setValue(timestamp);
       Logger.log('Timestamp: ' + timestamp + ' stored on row ' + rowToProcess);
       Logger.log('SUCCESS: Lead successfully sent to Zoho');
     } else {
