@@ -348,10 +348,12 @@
           }
         } else {
           content += `Failed to send`;
+          // Show either the error message OR validation errors, not both to avoid duplication
           if (result.error) {
+            // If error contains "Validation failed:", just show the error message
             content += `<div class="error-details">${result.error}</div>`;
-          }
-          if (result.validationErrors && result.validationErrors.length > 0) {
+          } else if (result.validationErrors && result.validationErrors.length > 0) {
+            // Only show validation errors if there's no error message
             content += `<div class="error-details">Validation errors: ${result.validationErrors.join(', ')}</div>`;
           }
         }

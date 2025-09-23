@@ -14,34 +14,21 @@ const CONFIG_CAMPAIGN_END_DATE = 'ZOHO_CAMPAIGN_END_DATE';
 const CONFIG_LEAD_ASSIGNMENT = 'ZOHO_LEAD_ASSIGNMENT';
 const CONFIG_ENABLED_COLUMNS = 'ZOHO_ENABLED_COLUMNS';
 
-const PROCESSING_MODE_AUTO = 'AUTO';
-const PROCESSING_MODE_MANUAL = 'MANUAL';
-
-// Organization types
-const ORG_TYPE_CORPORATE = 'KI';
-const ORG_TYPE_DEALER = 'DL';
-const ORG_TYPE_MOBILE_KLINIK = 'RT';
-
-// Lead assignment types
-const ASSIGNMENT_EQUAL = 'EQUAL';
-const ASSIGNMENT_MANUAL = 'MANUAL';
-const ASSIGNMENT_ADMIN = 'ADMIN';
-
 // Predefined organization settings
 const ORG_SETTINGS = {
-  [ORG_TYPE_CORPORATE]: {
+  'KI': {
     orgCode: '50080',
     orgTypeCode: 'KI',
     authTokenNameKey: 'AUTH_TOKEN_NAME_KI',
     authTokenValueKey: 'AUTH_TOKEN_VALUE_KI'
   },
-  [ORG_TYPE_MOBILE_KLINIK]: {
+  'RT': {
     orgCode: '6675',
     orgTypeCode: 'RT',
     authTokenNameKey: 'AUTH_TOKEN_NAME_RT',
     authTokenValueKey: 'AUTH_TOKEN_VALUE_RT'
   },
-  [ORG_TYPE_DEALER]: {
+  'DL': {
     orgTypeCode: 'DL'
     // orgCode, authTokenName, authTokenValue are user-provided
   }
@@ -51,9 +38,9 @@ const ORG_SETTINGS = {
  * Main setup function - displays the setup wizard
  */
 function showSetupWizard() {
-  const html = HtmlService.createHtmlOutputFromFile('setup_wizard_ui')
-    .setWidth(500)
-    .setHeight(400)
+  const html = HtmlService.createHtmlOutputFromFile('zoho_unified_ui')
+    .setWidth(650)
+    .setHeight(700)
     .setTitle('Zoho Integration Setup');
   
   SpreadsheetApp.getUi().showModalDialog(html, 'Setup Zoho Integration');
@@ -63,8 +50,9 @@ function showSetupWizard() {
  * Get current processing mode configuration
  */
 function getCurrentProcessingMode() {
-  const properties = PropertiesService.getScriptProperties();
-  return properties.getProperty(CONFIG_PROCESSING_MODE) || null;
+  const config = new ZohoConfig();
+  const currentConfig = config.getConfig();
+  return currentConfig.processingMode;
 }
 
 /**
@@ -84,7 +72,7 @@ function saveCompleteConfiguration(config) {
     
     // Save organization-specific settings
     const orgSettings = ORG_SETTINGS[config.organizationType];
-    if (config.organizationType === ORG_TYPE_DEALER) {
+    if (config.organizationType === 'DL') {
       // Dealership - save user-provided credentials
       properties.setProperty(CONFIG_ORG_CODE, config.orgCode);
       properties.setProperty(CONFIG_AUTH_TOKEN_NAME, config.authTokenName);
@@ -112,20 +100,14 @@ function saveCompleteConfiguration(config) {
     // Save lead assignment strategy
     properties.setProperty(CONFIG_LEAD_ASSIGNMENT, config.leadAssignment);
     
-    // Configure column enabling based on assignment strategy
-    const enabledColumns = {
-      channelOutletId: config.leadAssignment === ASSIGNMENT_EQUAL,
-      assignToSalesRepEmail: config.leadAssignment === ASSIGNMENT_MANUAL
-    };
-    properties.setProperty(CONFIG_ENABLED_COLUMNS, JSON.stringify(enabledColumns));
+    // Note: No longer using enabledColumns - single dynamic column approach
+    // Remove old enabledColumns property if it exists
+    properties.deleteProperty(CONFIG_ENABLED_COLUMNS);
     
     // Configure triggers and menu based on processing mode
-    removeExistingTriggers();
-    
-    if (config.processingMode === PROCESSING_MODE_AUTO) {
-      createAutomatedTrigger();
-    } else if (config.processingMode === PROCESSING_MODE_MANUAL) {
-      createCustomMenu();
+    const triggerResult = configureTriggers(config.processingMode);
+    if (!triggerResult.success) {
+      throw new Error(triggerResult.message);
     }
     
     // Update the CSV template with new columns
@@ -134,7 +116,7 @@ function saveCompleteConfiguration(config) {
     Logger.log('Configuration saved successfully');
     return { 
       success: true, 
-      message: `Configuration saved successfully! Your ${config.organizationType === ORG_TYPE_DEALER ? 'dealership' : (config.organizationType === ORG_TYPE_CORPORATE ? 'corporate store' : 'Mobile Klinik')} integration is now configured for ${config.triggerMode === TRIGGER_MODE_AUTO ? 'automated' : 'manual'} processing.` 
+      message: `Configuration saved successfully! Your ${config.organizationType === 'DL' ? 'dealership' : (config.organizationType === 'KI' ? 'corporate store' : 'Mobile Klinik')} integration is now configured for ${config.processingMode === 'AUTO' ? 'automated' : 'manual'} processing.`
     };
     
   } catch (error) {
@@ -143,102 +125,6 @@ function saveCompleteConfiguration(config) {
   }
 }
 
-/**
- * Set processing mode and configure accordingly (legacy function for backward compatibility)
- */
-function setTriggerMode(mode) {
-  Logger.log('Setting processing mode to: ' + mode);
-  
-  try {
-    const properties = PropertiesService.getScriptProperties();
-    properties.setProperty(CONFIG_PROCESSING_MODE, mode);
-    
-    // Remove existing triggers first
-    removeExistingTriggers();
-    
-    if (mode === PROCESSING_MODE_AUTO) {
-      // Create automated trigger
-      createAutomatedTrigger();
-      Logger.log('Automated processing mode configured successfully');
-      return { success: true, message: 'Automated processing mode configured successfully. Data will be sent to Zoho automatically when rows are edited.' };
-    } else if (mode === PROCESSING_MODE_MANUAL) {
-      // Setup manual mode (no triggers needed, just menu)
-      createCustomMenu();
-      Logger.log('Manual processing mode configured successfully');
-      return { success: true, message: 'Manual processing mode configured successfully. Use the "Send to Zoho" menu to process data.' };
-    } else {
-      throw new Error('Invalid processing mode: ' + mode);
-    }
-  } catch (error) {
-    Logger.log('Error setting processing mode: ' + error.toString());
-    return { success: false, message: 'Error configuring processing mode: ' + error.toString() };
-  }
-}
-
-/**
- * Remove all existing sendToWebhook triggers
- */
-function removeExistingTriggers() {
-  const allTriggers = ScriptApp.getProjectTriggers();
-  Logger.log('Found ' + allTriggers.length + ' existing triggers.');
-
-  for (let i = 0; i < allTriggers.length; i++) {
-    const handlerFunction = allTriggers[i].getHandlerFunction();
-    if (handlerFunction === 'sendToWebhook') {
-      Logger.log('Deleting existing trigger for sendToWebhook.');
-      ScriptApp.deleteTrigger(allTriggers[i]);
-    }
-  }
-}
-
-/**
- * Create automated trigger (same as original createTrigger function)
- */
-function createAutomatedTrigger() {
-  try {
-    ScriptApp.newTrigger('sendToWebhook')
-      .forSpreadsheet(SpreadsheetApp.getActive())
-      .onEdit()
-      .create();
-    Logger.log('New onEdit trigger for "sendToWebhook" created successfully.');
-  } catch (error) {
-    Logger.log('Error creating automated trigger: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Create custom menu for manual mode
- */
-function createCustomMenu() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Send to Zoho')
-    .addItem('Send unsubmitted rows to Zoho', 'sendUnsubmittedRowsToZoho')
-    .addSeparator()
-    .addItem('Change settings', 'showSetupWizard')
-    .addToUi();
-}
-
-/**
- * Initialize the integration based on current configuration
- * This should be called when the spreadsheet opens
- */
-function onOpen() {
-  const currentMode = getCurrentProcessingMode();
-  
-  if (currentMode === null) {
-    // First time setup - show wizard
-    SpreadsheetApp.getUi().alert(
-      'Zoho Integration Setup Required',
-      'This appears to be your first time using this spreadsheet. Please run the setup wizard to configure your integration.\n\nGo to Extensions > Apps Script, then run the "showSetupWizard" function.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-  } else if (currentMode === PROCESSING_MODE_MANUAL) {
-    // Create menu for manual mode
-    createCustomMenu();
-  }
-  // For auto mode, triggers are already set up, no menu needed
-}
 
 /**
  * Check if required configuration is complete
@@ -289,7 +175,7 @@ function getExistingConfiguration() {
   
   return {
     organizationType: properties.getProperty(CONFIG_ORGANIZATION_TYPE),
-    triggerMode: properties.getProperty(CONFIG_TRIGGER_MODE),
+    processingMode: properties.getProperty(CONFIG_PROCESSING_MODE),
     orgCode: properties.getProperty(CONFIG_ORG_CODE),
     campaignStartDate: properties.getProperty(CONFIG_CAMPAIGN_START_DATE),
     campaignEndDate: properties.getProperty(CONFIG_CAMPAIGN_END_DATE),
@@ -315,23 +201,50 @@ function getConfigurationValues() {
       orgTypeCode: ORG_SETTINGS[organizationType].orgTypeCode,
       campaignStartDate: properties.getProperty(CONFIG_CAMPAIGN_START_DATE),
       campaignEndDate: properties.getProperty(CONFIG_CAMPAIGN_END_DATE),
-      leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT),
-      enabledColumns: JSON.parse(properties.getProperty(CONFIG_ENABLED_COLUMNS) || '{}')
+      leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep'
     };
   } else {
     // Legacy configuration format - use global variables
     return {
-      processingMode: PROCESSING_MODE_AUTO, // Default for legacy
+      processingMode: 'AUTO', // Default for legacy
       authTokenName: AUTH_TOKEN_NAME,
       authTokenValue: AUTH_TOKEN_VALUE,
       orgCode: ORG__CODE,
       orgTypeCode: 'DL', // Default for legacy
       campaignStartDate: null,
       campaignEndDate: null,
-      leadAssignment: ASSIGNMENT_MANUAL,
-      enabledColumns: { channelOutletId: false, assignToSalesRepEmail: true }
+      leadAssignment: 'Sales_Rep' // Default for legacy
     };
   }
+}
+
+/**
+ * Get assignment column title based on lead assignment strategy
+ */
+function getAssignmentColumnTitle(leadAssignment) {
+  switch (leadAssignment) {
+    case 'Store': return 'Store Assignment';
+    case 'Sales_Rep': return 'Sales Rep Email';
+    case 'ADMIN': return 'Admin Assignment (N/A)';
+    default: return 'Assignment Value';
+  }
+}
+
+/**
+ * Get expected headers with dynamic assignment column
+ */
+function getExpectedHeaders() {
+  const properties = PropertiesService.getScriptProperties();
+  const leadAssignment = properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep';
+  const assignmentTitle = getAssignmentColumnTitle(leadAssignment);
+  
+  return [
+    'First_Name', 'Last_Name', 'Phone', 'Email', 'Language_Preference', 
+    'Datahub_Src', 'Campaign_Name', 'Description', 'Street', 'City', 
+    'State', 'Postal Code', 'Country', 'Rate_Plan_Description', 'Phone_Model', 
+    'Current_Provider', assignmentTitle, 
+    'Zoho_Record_URL', 'Time_Created_in_Zoho'
+  ];
 }
 
 /**
@@ -341,17 +254,13 @@ function updateSpreadsheetTemplate() {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const properties = PropertiesService.getScriptProperties();
-    const enabledColumns = JSON.parse(properties.getProperty(CONFIG_ENABLED_COLUMNS) || '{}');
+    const leadAssignment = properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep';
+    
+    // Get expected headers with dynamic assignment column
+    const expectedHeaders = getExpectedHeaders();
     
     // Update header row if needed
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const expectedHeaders = [
-      'First_Name', 'Last_Name', 'Phone', 'Email', 'Language_Preference', 
-      'Datahub_Src', 'Campaign_Name', 'Description', 'Street', 'City', 
-      'State', 'Zip_Code', 'Country', 'Rate_Plan_Description', 'Phone_Model', 
-      'Current_Provider', 'ChannelOutletID', 'AssigntoSalesRepEmail', 
-      'Zoho_Record_URL', 'Time_Created_in_Zoho'
-    ];
     
     // Check if we need to update headers
     let needsUpdate = false;
@@ -377,35 +286,28 @@ function updateSpreadsheetTemplate() {
       headerRange.setBorder(true, true, true, true, true, true);
     }
     
-    // Apply column formatting based on enabled columns
+    // Apply column formatting for single assignment column (Column 17)
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      // Column 17 (ChannelOutletID) formatting
-      const channelOutletRange = sheet.getRange(2, 17, lastRow - 1, 1);
-      if (enabledColumns.channelOutletId) {
-        channelOutletRange.setBackground('#ffffff');
-        channelOutletRange.setFontColor('#000000');
-        channelOutletRange.protect().setDescription('ChannelOutletID column - enabled for data entry');
-      } else {
-        channelOutletRange.setBackground('#f5f5f5');
-        channelOutletRange.setFontColor('#9aa0a6');
-        channelOutletRange.protect().setDescription('ChannelOutletID column - disabled');
-      }
+      const assignmentRange = sheet.getRange(2, 17, lastRow - 1, 1);
       
-      // Column 18 (AssigntoSalesRepEmail) formatting
-      const salesRepRange = sheet.getRange(2, 18, lastRow - 1, 1);
-      if (enabledColumns.assignToSalesRepEmail) {
-        salesRepRange.setBackground('#ffffff');
-        salesRepRange.setFontColor('#000000');
-        salesRepRange.protect().setDescription('AssigntoSalesRepEmail column - enabled for data entry');
+      if (leadAssignment === 'ADMIN') {
+        // Admin assignment - disable the column since no input needed
+        assignmentRange.setBackground('#f5f5f5');
+        assignmentRange.setFontColor('#9aa0a6');
+        assignmentRange.protect().setDescription('Admin assignment - no input required');
       } else {
-        salesRepRange.setBackground('#f5f5f5');
-        salesRepRange.setFontColor('#9aa0a6');
-        salesRepRange.protect().setDescription('AssigntoSalesRepEmail column - disabled');
+        // Store or Sales Rep assignment - enable the column
+        assignmentRange.setBackground('#ffffff');
+        assignmentRange.setFontColor('#000000');
+        const description = leadAssignment === 'Store' ? 
+          'Store assignment - enter Channel Outlet ID' : 
+          'Sales Rep assignment - enter sales rep email';
+        assignmentRange.protect().setDescription(description);
       }
     }
     
-    Logger.log('Spreadsheet template updated successfully');
+    Logger.log('Spreadsheet template updated successfully with dynamic assignment column');
     
   } catch (error) {
     Logger.log('Error updating spreadsheet template: ' + error.toString());

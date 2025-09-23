@@ -9,8 +9,8 @@ This document provides an overview of all files in the enhanced organization-spe
 - **Changes**: 
   - Added trigger mode checking (only runs in automated mode)
   - Integrated with new configuration system for organization-specific settings
-  - Updated payload structure for new fields (Language_Preference, ChannelOutletID, AssigntoSalesRepEmail)
-  - Dynamic assignment field handling based on configuration
+  - Updated payload structure for new fields (Language_Preference, dynamic assignment column)
+  - Single dynamic assignment field handling based on configuration
   - Uses configured campaign dates instead of calculated dates
   - Updated column references for new template structure
 - **Key Functions**: `sendToWebhook(e)`
@@ -83,9 +83,9 @@ This document provides an overview of all files in the enhanced organization-spe
 
 ### **Zoho_Webhook_Template_App_Script.csv** *(Updated)*
 - **Purpose**: Template spreadsheet with correct column headers
-- **Changes**: Added new columns for Language_Preference, ChannelOutletID, AssigntoSalesRepEmail
-- **New Structure**: 20 columns total including new assignment and language fields
-- **Current Columns**: First_Name, Last_Name, Phone, Email, Language_Preference, Datahub_Src, Campaign_Name, Description, Street, City, State, Zip_Code, Country, Rate_Plan_Description, Phone_Model, Current_Provider, ChannelOutletID, AssigntoSalesRepEmail, Zoho_Record_URL, Time_Created_in_Zoho
+- **Changes**: Updated to use single dynamic assignment column and "Postal Code" header
+- **New Structure**: 19 columns total with consolidated assignment column
+- **Current Columns**: First_Name, Last_Name, Phone, Email, Language_Preference, Datahub_Src, Campaign_Name, Description, Street, City, State, Postal Code, Country, Rate_Plan_Description, Phone_Model, Current_Provider, Assignment Value, Zoho_Record_URL, Time_Created_in_Zoho
 
 ## **Documentation**
 
