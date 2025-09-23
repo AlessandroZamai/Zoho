@@ -239,10 +239,10 @@ function getExpectedHeaders() {
   const assignmentTitle = getAssignmentColumnTitle(leadAssignment);
   
   return [
-    'First_Name', 'Last_Name', 'Phone', 'Email', 'Language_Preference', 
-    'Datahub_Src', 'Campaign_Name', 'Description', 'Street', 'City', 
-    'State', 'Postal Code', 'Country', 'Rate_Plan_Description', 'Phone_Model', 
-    'Current_Provider', assignmentTitle, 
+    'First Name', 'Last Name', 'Phone', 'Email', 'Preferred Language', 
+    'Campaign Name', 'Description', 'Street', 'City', 
+    'Province', 'Postal Code', 'Country', 'Rate Plan', 'Device Model', 
+    'Current Provider', assignmentTitle,
     'Zoho_Record_URL', 'Time_Created_in_Zoho'
   ];
 }

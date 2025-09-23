@@ -41,18 +41,14 @@ function validateRowDataUnified(rowData, rowNumber) {
   }
   
   if (!rowData[5] || rowData[5].toString().trim() === '') {
-    errors.push('Datahub_Src is required');
+    errors.push('Campaign Name is required');
   }
   
-  if (!rowData[6] || rowData[6].toString().trim() === '') {
-    errors.push('Campaign_Name is required');
-  }
-  
-  // Validate Language_Preference field (column 5)
+  // Validate Preferred Language field (column 4)
   if (rowData[4] && rowData[4].toString().trim() !== '') {
     const languagePreference = rowData[4].toString().trim().toLowerCase();
     if (languagePreference !== 'en-ca' && languagePreference !== 'fr-ca') {
-      errors.push('Language Preference must be either "en-ca" or "fr-ca"');
+      errors.push('Preferred Language must be either "en-ca" or "fr-ca"');
     }
   }
   
@@ -65,9 +61,9 @@ function validateRowDataUnified(rowData, rowNumber) {
     warnings.push('City is missing');
   }
   
-  // Validate assignment fields based on configuration (single dynamic column at index 16)
+  // Validate assignment fields based on configuration (single dynamic column at index 15)
   const config = getConfigurationValues();
-  const assignmentValue = rowData[16]; // Single assignment column
+  const assignmentValue = rowData[15]; // Single assignment column
   
   if (config.leadAssignment === 'Store') {
     if (!assignmentValue || assignmentValue.toString().trim() === '') {

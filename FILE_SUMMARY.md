@@ -85,7 +85,7 @@ This document provides an overview of all files in the enhanced organization-spe
 - **Purpose**: Template spreadsheet with correct column headers
 - **Changes**: Updated to use single dynamic assignment column and "Postal Code" header
 - **New Structure**: 19 columns total with consolidated assignment column
-- **Current Columns**: First_Name, Last_Name, Phone, Email, Language_Preference, Datahub_Src, Campaign_Name, Description, Street, City, State, Postal Code, Country, Rate_Plan_Description, Phone_Model, Current_Provider, Assignment Value, Zoho_Record_URL, Time_Created_in_Zoho
+- **Current Columns**: First Name, Last Name, Phone, Email, Preferred Language, Datahub_Src, Campaign Name, Description, Street, City, State, Postal Code, Country, Rate Plan, Device Model, Current Provider, Assignment Value, Zoho_Record_URL, Time_Created_in_Zoho
 
 ## **Documentation**
 

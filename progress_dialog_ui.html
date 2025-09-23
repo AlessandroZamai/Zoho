@@ -270,12 +270,19 @@
       updateProgressText();
       
       if (totalRows === 0) {
-        updateStatus('No rows to process', true);
+        updateStatus('No unsubmitted rows found', true);
+        
+        // Show information about already processed rows
+        google.script.run
+          .withSuccessHandler(showIgnoredRowsInfo)
+          .withFailureHandler(onError)
+          .getProcessedRowsCount();
+        
         enableCloseButton();
         return;
       }
       
-      updateStatus('Processing ' + totalRows + ' rows...', false);
+      updateStatus('Processing ' + totalRows + ' unsubmitted rows...', false);
       
       // Start processing all rows
       google.script.run
@@ -395,6 +402,26 @@
     
     function enableCloseButton() {
       document.getElementById('closeBtn').disabled = false;
+    }
+    
+    function showIgnoredRowsInfo(rowCounts) {
+      const resultsList = document.getElementById('resultsList');
+      
+      if (rowCounts.totalDataRows > 0) {
+        const infoItem = document.createElement('div');
+        infoItem.className = 'result-item result-processing';
+        infoItem.innerHTML = `
+          <span class="row-number">ℹ️ Summary:</span>
+          Found ${rowCounts.totalDataRows} total data rows. 
+          ${rowCounts.processedCount} rows have already been processed and were ignored.
+        `;
+        resultsList.appendChild(infoItem);
+      } else {
+        const infoItem = document.createElement('div');
+        infoItem.className = 'result-item result-processing';
+        infoItem.innerHTML = `<span class="row-number">ℹ️ Info:</span> No data rows found in the spreadsheet.`;
+        resultsList.appendChild(infoItem);
+      }
     }
     
     function onError(error) {

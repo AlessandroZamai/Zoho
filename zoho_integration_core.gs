@@ -238,17 +238,17 @@ function buildZohoPayload(rowData) {
       Phone: phone,
       Email: rowData[3],
       Language_Preference: rowData[4],
-      Datahub_Src: rowData[5],
-      Campaign_Name: rowData[6],
-      Description: rowData[7],
-      Street: rowData[8],
-      City: rowData[9],
-      State: rowData[10],
-      Zip_Code: rowData[11], // Column 12 "Postal Code" maps to API field "Zip_Code"
-      Country: rowData[12],
-      Rate_Plan_Description: rowData[13],
-      Phone_Model: rowData[14],
-      Brand: rowData[15],
+      Datahub_Src: "Google Apps Script " + ZOHO_VERSION,
+      Campaign_Name: rowData[5],
+      Description: rowData[6],
+      Street: rowData[7],
+      City: rowData[8],
+      State: rowData[9],
+      Zip_Code: rowData[10], // Column 11 "Postal Code" maps to API field "Zip_Code"
+      Country: rowData[11],
+      Rate_Plan_Description: rowData[12],
+      Phone_Model: rowData[13],
+      Brand: rowData[14],
       notify_record_owner: true,
       OrgTypeCode: config.orgTypeCode,
       Organization_Code: config.orgCode,
@@ -258,8 +258,8 @@ function buildZohoPayload(rowData) {
       Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
     };
     
-    // Add assignment field based on configuration (single dynamic column at index 16)
-    const assignmentValue = rowData[16]; // Single assignment column
+    // Add assignment field based on configuration (single dynamic column at index 15)
+    const assignmentValue = rowData[15]; // Single assignment column
     if (assignmentValue && assignmentValue.toString().trim() !== '') {
       switch (config.leadAssignment) {
         case 'Store':
@@ -349,12 +349,12 @@ function updateSpreadsheetWithResult(rowNumber, recordId) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     
-    // Update record ID column (18) - shifted left by 1 due to column consolidation
-    sheet.getRange(rowNumber, 18).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+    // Update record ID column (17) - shifted left by 2 due to Datahub_Src removal
+    sheet.getRange(rowNumber, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
     
-    // Update timestamp column (19) - shifted left by 1 due to column consolidation
+    // Update timestamp column (18) - shifted left by 2 due to Datahub_Src removal
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-    sheet.getRange(rowNumber, 19).setValue(timestamp);
+    sheet.getRange(rowNumber, 18).setValue(timestamp);
     
     Logger.log('Spreadsheet updated for row ' + rowNumber);
     return { success: true };
@@ -390,7 +390,7 @@ function validateEditEvent(e) {
   
   // Check if row has already been processed
   const sheet = SpreadsheetApp.getActiveSheet();
-  const recordIdCell = sheet.getRange(rowToProcess, 18).getValue(); // Column 18 - shifted left by 1
+  const recordIdCell = sheet.getRange(rowToProcess, 17).getValue(); // Column 17 - shifted left by 2 due to Datahub_Src removal
   if (recordIdCell && recordIdCell.toString().trim() !== '') {
     Logger.log('Row ' + rowToProcess + ' has already been processed. Ignoring.');
     return null;
@@ -399,7 +399,7 @@ function validateEditEvent(e) {
   // Check if assignment column has data when ADMIN assignment is configured
   const config = getConfigurationValues();
   if (config.leadAssignment === 'ADMIN') {
-    const assignmentValue = sheet.getRange(rowToProcess, 17).getValue();
+    const assignmentValue = sheet.getRange(rowToProcess, 16).getValue(); // Column 16 - assignment column
     if (assignmentValue && assignmentValue.toString().trim() !== '') {
       Logger.log('Row ' + rowToProcess + ' has data in assignment column but ADMIN assignment is configured. Ignoring.');
       return null;
@@ -424,8 +424,8 @@ function getUnsubmittedRows() {
   
   // Start from row 2 (skip header)
   for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
-    // Check if Record ID column (18) is empty - shifted left by 1 due to column consolidation
-    const recordIdCell = sheet.getRange(rowNum, 18).getValue();
+    // Check if Record ID column (17) is empty - shifted left by 2 due to Datahub_Src removal
+    const recordIdCell = sheet.getRange(rowNum, 17).getValue();
     
     if (!recordIdCell || recordIdCell.toString().trim() === '') {
       // Get all data for this row
@@ -492,6 +492,42 @@ function getRowsToProcess() {
   const properties = PropertiesService.getScriptProperties();
   const rowsJson = properties.getProperty('ROWS_TO_PROCESS');
   return rowsJson ? JSON.parse(rowsJson) : [];
+}
+
+/**
+ * Get count of already processed rows (for UI feedback)
+ */
+function getProcessedRowsCount() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  
+  if (lastRow <= 1) {
+    return { processedCount: 0, totalDataRows: 0 };
+  }
+  
+  let processedCount = 0;
+  let totalDataRows = 0;
+  
+  // Start from row 2 (skip header)
+  for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
+    // Get all data for this row
+    const rowData = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Check if row has any data (not completely empty)
+    const hasData = rowData.some(cell => cell && cell.toString().trim() !== '');
+    
+    if (hasData) {
+      totalDataRows++;
+      
+      // Check if Record ID column (17) has data
+      const recordIdCell = sheet.getRange(rowNum, 17).getValue();
+      if (recordIdCell && recordIdCell.toString().trim() !== '') {
+        processedCount++;
+      }
+    }
+  }
+  
+  return { processedCount, totalDataRows };
 }
 
 /**

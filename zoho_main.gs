@@ -7,7 +7,7 @@
 // SHARED CONSTANTS AND CONFIGURATION
 // ============================================================================
 
-const ZOHO_VERSION = '2.0.0';
+const ZOHO_VERSION = 'v2.0.0';
 const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f';
 
 // Configuration keys
