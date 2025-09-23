@@ -47,15 +47,19 @@ To access the Zoho webhook please follow the below process:
 | ----- | :---- | :---- | ----- |
 | auth\_token\_name | auth\_token\_name | Email [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com) to receive your organization’s token | Yes |
 | auth\_token\_value | auth\_token\_value |  | Yes |
-| First Name | First\_Name |  | Yes |
-| Last Name | Last\_Name |  | Yes |
+| First Name | First\_Name | Customer’s first name | Yes |
+| Last Name | Last\_Name | Customer’s last name | Yes |
 | Phone | Phone | Must contain 10 digits without symbols or spaces | Yes |
+| Email | Email | Customer email | No |
+| Language Preference | Language\_Preference | Customer’s preference language.NOTE: Only accept “en-ca” and “fr-ca”. By default it is “en-ca” | No |
 | Consent to Contact Captured | Consent\_to\_Contact\_Captured | Pass “true” for value | Yes |
 | Created By Email | Created\_By\_Email | Individual responsible for data source that TELUS can contact | Yes |
 | Campaign Start Date | Campaign\_Start\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Data\_Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
-| Campaign\_Name | Campaign\_Name |  | Yes |
+| Campaign\_Name | Campaign\_Name | Name of the Marketing campaign which helps reps understand the purpose for the call campaign this lead is related to | Yes |
+| Description | Description | Describe what you want your sales reps to know about this lead or marketing campaign. Information passed in this field is also saved as a Note. To add new line use “\\n” Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
+| Quote ID | Quote\_ID | Field to store quotes, order numbers etc. | No |
 | OrgTypeCode | OrgTypeCode | The values would be KI, DL, RT.KI \= CorporateDL \= DealerRT \= Mobile Klinik | Yes |
 | Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
 | Street | Street |  | No |
@@ -66,7 +70,6 @@ To access the Zoho webhook please follow the below process:
 | Rate Plan Description | Rate\_Plan\_Description |  | No |
 | Device Model | Phone\_Model |  | No |
 | Current Provider | Brand |  | No |
-| Description | Description | Describe what you want your sales reps to know about this lead.  Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
 | Note | note | Add note to the lead. To add new line in the note use “\\n” | No |
 | notify\_record\_owner | notify\_record\_owner | Pass boolean “true” to send email notification on lead creation to record owner | No |
 | share\_with\_other\_users | share\_with\_other\_users | Pass boolean “true” to share records with other peers. Only for KI and RT. | No |
