@@ -111,6 +111,8 @@ Test webhook json body:
 "First_Name":"test apple",
 "Last_Name":"Test postman",
 "Phone":"1231231234",
+"Email":"test@example.com",
+"Language_Preference":"en-ca",
 "Rate_Plan_Description": "$55 Unlimited US/CAN",
 "Phone_Model": "samsung",
 "Consent_to_Contact_Captured": true,
