@@ -52,7 +52,7 @@ To access the Zoho webhook please follow the below process:
 | Phone | Phone | Must contain 10 digits without symbols or spaces | Yes |
 | Email | Email | Customer email | No |
 | Language Preference | Language\_Preference | Customer’s preference language.NOTE: Only accept “en-ca” and “fr-ca”. By default it is “en-ca” | No |
-| Consent to Contact Captured | Consent\_to\_Contact\_Captured | Pass “true” for value | Yes |
+| Consent to Contact Captured | Consent\_to\_Contact\_Captured | Always pass “true” | Yes |
 | Created By Email | Created\_By\_Email | Individual responsible for data source that TELUS can contact | Yes |
 | Campaign Start Date | Campaign\_Start\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
