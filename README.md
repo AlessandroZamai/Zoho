@@ -64,7 +64,7 @@ To access the Zoho webhook please follow the below process:
 | Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
 | Street | Street |  | No |
 | City | City |  | No |
-| Province | State |  | No |
+| Province | Province | Short code like ON, BC, QC | No |
 | Postal Code | Zip\_Code | 6-digits can include spaces | No |
 | Country | Country |  | No |
 | Rate Plan Description | Rate\_Plan\_Description |  | No |
