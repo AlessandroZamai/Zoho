@@ -1,0 +1,75 @@
+name: Deploy to Production
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install clasp
+        run: npm install -g @google/clasp
+        
+      - name: Authenticate with Google
+        run: |
+          echo '${{ secrets.GOOGLE_CREDENTIALS_PRODUCTION }}' > ~/.clasprc.json
+          
+      - name: Set up Apps Script project
+        run: |
+          echo '${{ secrets.CLASP_SETTINGS_PRODUCTION }}' > .clasp.json
+          
+      - name: Update version in code
+        run: |
+          # Update version in version.gs file
+          cat > version.gs << EOF
+          // Auto-generated version file
+          const ADDON_VERSION = "${{ inputs.version }}";
+          const BUILD_DATE = "$(date -u +%Y-%m-%dT%H:%M:%SZ)";
+          const COMMIT_HASH = "${{ github.sha }}";
+          
+          function getVersionInfo() {
+            return {
+              version: ADDON_VERSION,
+              buildDate: BUILD_DATE,
+              commitHash: COMMIT_HASH
+            };
+          }
+          EOF
+          
+      - name: Deploy to production
+        run: |
+          clasp push --force
+          DEPLOYMENT_ID=$(clasp deploy --description "Production ${{ inputs.version }} - $(date)" | grep -o 'AKfycby[A-Za-z0-9_-]*')
+          echo "Deployed to production with ID: $DEPLOYMENT_ID"
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ inputs.version }}
+          release_name: Release ${{ inputs.version }}
+          body: |
+            Production deployment of Zoho Lead Integration Add-on
+            
+            **Deployment Details:**
+            - Version: ${{ inputs.version }}
+            - Deployment ID: ${{ env.DEPLOYMENT_ID }}
+            - Commit: ${{ github.sha }}
+            - Deployed: $(date)
+          draft: false
+          prerelease: false

@@ -1,0 +1,51 @@
+{
+  "timeZone": "America/Toronto",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Sheets",
+        "serviceId": "sheets",
+        "version": "v4"
+      }
+    ]
+  },
+  "addOns": {
+    "common": {
+      "name": "TELUS Zoho Lead Integration",
+      "logoUrl": "https://www.telus.com/favicon.ico",
+      "useLocaleFromApp": true,
+      "homepageTrigger": {
+        "runFunction": "onHomepage"
+      },
+      "universalActions": [
+        {
+          "label": "Configure Integration",
+          "runFunction": "openConfiguration"
+        },
+        {
+          "label": "View Status",
+          "runFunction": "showStatus"
+        },
+        {
+          "label": "Manual Sync",
+          "runFunction": "manualSync"
+        }
+      ]
+    },
+    "sheets": {
+      "homepageTrigger": {
+        "runFunction": "onSheetsHomepage"
+      },
+      "onFileScopeGrantedTrigger": {
+        "runFunction": "onFileScopeGranted"
+      }
+    }
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/drive.file"
+  ],
+  "runtimeVersion": "V8"
+}
