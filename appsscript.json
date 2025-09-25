@@ -45,7 +45,15 @@
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/script.scriptapp",
-    "https://www.googleapis.com/auth/drive.file"
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/script.locale",
+    "https://www.googleapis.com/auth/script.container.ui"
+  ],
+  "urlFetchWhitelist": [
+    "https://sandbox.zohoapis.com/",
+    "https://crm.zoho.com/",
+    "https://www.telus.com/",
+    "https://github.com/"
   ],
   "runtimeVersion": "V8"
 }

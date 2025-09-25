@@ -11,12 +11,36 @@ function onOpen() {
   const currentMode = getCurrentProcessingMode();
   
   if (currentMode === null) {
-    // First time setup - show wizard
-    SpreadsheetApp.getUi().alert(
-      'Zoho Integration Setup Required',
-      'This appears to be your first time using this spreadsheet. Please run the setup wizard to configure your integration.\n\nGo to Extensions > Apps Script, then run the "showSetupWizard" function.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    // Check if this is a configuration issue vs first-time setup
+    const configStatus = isConfigurationComplete();
+    
+    if (!configStatus.complete) {
+      // Check if it's an admin credential issue
+      const properties = PropertiesService.getScriptProperties();
+      const organizationType = properties.getProperty('ZOHO_ORGANIZATION_TYPE');
+      
+      if (organizationType === 'KI' || organizationType === 'RT') {
+        // User has started setup but admin credentials are missing
+        const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
+        const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+        
+        if (!kiTokenName || !rtTokenName) {
+          SpreadsheetApp.getUi().alert(
+            'Administrator Setup Required',
+            `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to run "adminSetupCredentials" in Apps Script, or complete the setup wizard.`,
+            SpreadsheetApp.getUi().ButtonSet.OK
+          );
+          return;
+        }
+      }
+      
+      // General configuration incomplete
+      SpreadsheetApp.getUi().alert(
+        'Zoho Integration Setup Required',
+        'Configuration is incomplete. Please use the TELUS Zoho Lead Integration add-on to configure your integration.\n\nGo to Extensions > TELUS Zoho Lead Integration > Settings to complete setup.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    }
   } else if (currentMode === 'MANUAL') {
     // Create menu for manual mode
     createCustomMenu();

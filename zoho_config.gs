@@ -38,12 +38,277 @@ const ORG_SETTINGS = {
  * Main setup function - displays the setup wizard
  */
 function showSetupWizard() {
-  const html = HtmlService.createHtmlOutputFromFile('zoho_unified_ui')
-    .setWidth(650)
-    .setHeight(700)
-    .setTitle('Zoho Integration Setup');
-  
-  SpreadsheetApp.getUi().showModalDialog(html, 'Setup Zoho Integration');
+  try {
+    // Check if we're in a spreadsheet context
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    if (!spreadsheet) {
+      throw new Error('No active spreadsheet found');
+    }
+    
+    const html = HtmlService.createHtmlOutputFromFile('zoho_unified_ui')
+      .setWidth(650)
+      .setHeight(700)
+      .setTitle('Zoho Integration Setup');
+    
+    SpreadsheetApp.getUi().showModalDialog(html, 'Setup Zoho Integration');
+    
+  } catch (error) {
+    // If we can't access the UI (e.g., running from Apps Script editor), provide alternative
+    if (error.message.includes('Cannot call SpreadsheetApp.getUi()') || 
+        error.message.includes('No active spreadsheet found')) {
+      
+      Logger.log('Setup wizard cannot be displayed from this context. Please run from a spreadsheet.');
+      
+      // Try to show a simple alert if possible, otherwise just log
+      try {
+        Browser.msgBox(
+          'Setup Wizard Error',
+          'The setup wizard must be run from within a Google Spreadsheet context.\n\n' +
+          'Please:\n' +
+          '1. Open your Google Spreadsheet\n' +
+          '2. Go to Extensions > Apps Script\n' +
+          '3. Run showSetupWizard() from there\n\n' +
+          'Or use the add-on interface to configure settings.',
+          Browser.Buttons.OK
+        );
+      } catch (browserError) {
+        // If Browser.msgBox also fails, just log the instructions
+        Logger.log('SETUP INSTRUCTIONS: The setup wizard must be run from within a Google Spreadsheet context. Please open your spreadsheet and run the function from there.');
+      }
+      
+      return {
+        success: false,
+        message: 'Setup wizard must be run from spreadsheet context. Please open your spreadsheet and try again.'
+      };
+    } else {
+      // Re-throw other errors
+      throw error;
+    }
+  }
+}
+
+/**
+ * Alternative setup function that works from any context
+ * Use this when showSetupWizard() fails due to context issues
+ */
+function setupFromConsole() {
+  try {
+    Logger.log('Starting console-based setup...');
+    
+    // Check current configuration
+    const configStatus = isConfigurationComplete();
+    const properties = PropertiesService.getScriptProperties();
+    
+    Logger.log('Current configuration status: ' + JSON.stringify(configStatus));
+    
+    if (configStatus.complete) {
+      Logger.log('Configuration is already complete. Use showSetupWizard() from a spreadsheet to modify settings.');
+      return { success: true, message: 'Configuration already complete' };
+    }
+    
+    // Check what's missing
+    const organizationType = properties.getProperty('ZOHO_ORGANIZATION_TYPE');
+    const currentMode = getCurrentProcessingMode();
+    
+    let instructions = 'Setup Instructions:\n\n';
+    
+    if (!organizationType) {
+      instructions += '1. No organization type set. Please run showSetupWizard() from your spreadsheet.\n';
+    } else {
+      instructions += `Organization Type: ${organizationType}\n`;
+      
+      if (organizationType === 'KI' || organizationType === 'RT') {
+        // Check admin credentials
+        const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
+        const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+        
+        if (!kiTokenName || !rtTokenName) {
+          instructions += '2. Missing administrator credentials. Run adminSetupCredentials() first.\n';
+        } else {
+          instructions += '2. Administrator credentials are set.\n';
+        }
+      }
+      
+      if (!currentMode) {
+        instructions += '3. Processing mode not set. Complete setup using showSetupWizard() from spreadsheet.\n';
+      } else {
+        instructions += `3. Processing mode: ${currentMode}\n`;
+      }
+    }
+    
+    instructions += '\nRecommended actions:\n';
+    instructions += '- Run adminSetupCredentials() if you are an administrator\n';
+    instructions += '- Open your spreadsheet and run showSetupWizard() to complete user setup\n';
+    instructions += '- Use the add-on interface for configuration\n';
+    
+    Logger.log(instructions);
+    
+    return { success: true, message: instructions };
+    
+  } catch (error) {
+    Logger.log('Error in console setup: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+/**
+ * Administrator setup function - initializes predefined credentials for KI and RT
+ * This should be run once by an administrator before users can configure KI/RT integrations
+ */
+function adminSetupCredentials() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // Check if credentials already exist
+    const properties = PropertiesService.getScriptProperties();
+    const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
+    const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+    
+    if (kiTokenName && rtTokenName) {
+      const overwrite = ui.alert(
+        'Credentials Already Exist',
+        'Predefined credentials for KI and RT organizations already exist. Do you want to overwrite them?',
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (overwrite !== ui.Button.YES) {
+        return { success: false, message: 'Setup cancelled by user' };
+      }
+    }
+    
+    // Security warning
+    const securityWarning = ui.alert(
+      'Administrator Credential Setup',
+      'This will set up predefined credentials for Corporate Store (KI) and Mobile Klinik (RT) organizations.\n\nMake sure you are in a secure environment and no one can see your screen.\n\nContinue?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (securityWarning !== ui.Button.YES) {
+      return { success: false, message: 'Setup cancelled by user' };
+    }
+    
+    // Get KI credentials
+    const kiTokenNameInput = ui.prompt(
+      'Corporate Store (KI) - Token Name', 
+      'Enter the auth token name for Corporate Store (KI):\n(e.g., telus_gapps_token)'
+    );
+    
+    if (kiTokenNameInput.getSelectedButton() !== ui.Button.OK || !kiTokenNameInput.getResponseText()) {
+      throw new Error('KI token name is required');
+    }
+    
+    const kiTokenValueInput = ui.prompt(
+      'Corporate Store (KI) - Token Value', 
+      'Enter the auth token value for Corporate Store (KI):'
+    );
+    
+    if (kiTokenValueInput.getSelectedButton() !== ui.Button.OK || !kiTokenValueInput.getResponseText()) {
+      throw new Error('KI token value is required');
+    }
+    
+    // Get RT credentials  
+    const rtTokenNameInput = ui.prompt(
+      'Mobile Klinik (RT) - Token Name', 
+      'Enter the auth token name for Mobile Klinik (RT):\n(e.g., mobile_klinik_gapps_token)'
+    );
+    
+    if (rtTokenNameInput.getSelectedButton() !== ui.Button.OK || !rtTokenNameInput.getResponseText()) {
+      throw new Error('RT token name is required');
+    }
+    
+    const rtTokenValueInput = ui.prompt(
+      'Mobile Klinik (RT) - Token Value', 
+      'Enter the auth token value for Mobile Klinik (RT):'
+    );
+    
+    if (rtTokenValueInput.getSelectedButton() !== ui.Button.OK || !rtTokenValueInput.getResponseText()) {
+      throw new Error('RT token value is required');
+    }
+    
+    // Store credentials securely
+    properties.setProperties({
+      'AUTH_TOKEN_NAME_KI': kiTokenNameInput.getResponseText(),
+      'AUTH_TOKEN_VALUE_KI': kiTokenValueInput.getResponseText(),
+      'AUTH_TOKEN_NAME_RT': rtTokenNameInput.getResponseText(),
+      'AUTH_TOKEN_VALUE_RT': rtTokenValueInput.getResponseText()
+    });
+    
+    Logger.log('Administrator credentials initialized securely');
+    
+    ui.alert(
+      'Setup Complete',
+      'Predefined credentials for Corporate Store (KI) and Mobile Klinik (RT) have been stored securely.\n\nUsers can now configure their integrations using the setup wizard.',
+      ui.ButtonSet.OK
+    );
+    
+    return { success: true, message: 'Administrator credentials initialized securely' };
+    
+  } catch (error) {
+    Logger.log('Error in administrator credential setup: ' + error.toString());
+    
+    SpreadsheetApp.getUi().alert(
+      'Setup Error',
+      'Failed to set up administrator credentials: ' + error.toString(),
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return { success: false, message: error.toString() };
+  }
+}
+
+/**
+ * Verify administrator credentials are set up
+ */
+function verifyAdminCredentials() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    
+    const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
+    const kiTokenValue = properties.getProperty('AUTH_TOKEN_VALUE_KI');
+    const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+    const rtTokenValue = properties.getProperty('AUTH_TOKEN_VALUE_RT');
+    
+    let message = 'Administrator Credentials Status:\n\n';
+    
+    message += 'Corporate Store (KI):\n';
+    message += `- Token Name: ${kiTokenName ? '✅ Set' : '❌ Missing'}\n`;
+    message += `- Token Value: ${kiTokenValue ? '✅ Set' : '❌ Missing'}\n\n`;
+    
+    message += 'Mobile Klinik (RT):\n';
+    message += `- Token Name: ${rtTokenName ? '✅ Set' : '❌ Missing'}\n`;
+    message += `- Token Value: ${rtTokenValue ? '✅ Set' : '❌ Missing'}\n\n`;
+    
+    const allSet = kiTokenName && kiTokenValue && rtTokenName && rtTokenValue;
+    
+    if (allSet) {
+      message += '✅ All administrator credentials are properly configured\n\n';
+      message += 'Users can now configure KI and RT integrations using the setup wizard.';
+    } else {
+      message += '❌ Some administrator credentials are missing\n\n';
+      message += 'Run adminSetupCredentials() to set up missing credentials.';
+    }
+    
+    SpreadsheetApp.getUi().alert(
+      'Administrator Credential Verification',
+      message,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    Logger.log('Administrator credential verification: ' + message);
+    
+    return {
+      success: true,
+      allSet: allSet,
+      details: {
+        ki: { tokenName: !!kiTokenName, tokenValue: !!kiTokenValue },
+        rt: { tokenName: !!rtTokenName, tokenValue: !!rtTokenValue }
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error verifying administrator credentials: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
 }
 
 /**
@@ -194,6 +459,7 @@ function getConfigurationValues() {
   if (organizationType) {
     // New configuration format
     return {
+      organizationType: organizationType,
       processingMode: properties.getProperty(CONFIG_PROCESSING_MODE),
       authTokenName: properties.getProperty(CONFIG_AUTH_TOKEN_NAME),
       authTokenValue: properties.getProperty(CONFIG_AUTH_TOKEN_VALUE),
@@ -204,16 +470,17 @@ function getConfigurationValues() {
       leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep'
     };
   } else {
-    // Legacy configuration format - use global variables
+    // No configuration exists - return empty configuration
     return {
-      processingMode: 'AUTO', // Default for legacy
-      authTokenName: AUTH_TOKEN_NAME,
-      authTokenValue: AUTH_TOKEN_VALUE,
-      orgCode: ORG__CODE,
-      orgTypeCode: 'DL', // Default for legacy
+      organizationType: null,
+      processingMode: null,
+      authTokenName: null,
+      authTokenValue: null,
+      orgCode: null,
+      orgTypeCode: null,
       campaignStartDate: null,
       campaignEndDate: null,
-      leadAssignment: 'Sales_Rep' // Default for legacy
+      leadAssignment: 'Sales_Rep'
     };
   }
 }
