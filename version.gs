@@ -1,9 +1,9 @@
 // Auto-generated version file - DO NOT EDIT MANUALLY
 // This file is updated automatically by GitHub Actions during deployment
 
-const ADDON_VERSION = "v2.0.0";
-const BUILD_DATE = "2025-09-25T15:53:00Z";
-const COMMIT_HASH = "7ee485d";
+const ADDON_VERSION = "v2.0.2";
+const BUILD_DATE = "2025-09-25T15:58:00Z";
+const COMMIT_HASH = "f067791";
 
 /**
  * Get version information
