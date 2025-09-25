@@ -1,0 +1,66 @@
+name: Deploy Add-on
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install clasp
+        run: npm install -g @google/clasp
+        
+      - name: Authenticate with Google
+        run: |
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > ~/.clasprc.json
+          
+      - name: Set up Apps Script project
+        run: |
+          echo '${{ secrets.CLASP_SETTINGS }}' > .clasp.json
+          
+      - name: Update version in code
+        run: |
+          # Update version in version.gs file
+          cat > version.gs << EOF
+          // Auto-generated version file - DO NOT EDIT MANUALLY
+          const ADDON_VERSION = "1.0.0-$(date +%Y%m%d%H%M)";
+          const BUILD_DATE = "$(date -u +%Y-%m-%dT%H:%M:%SZ)";
+          const COMMIT_HASH = "${{ github.sha }}";
+          
+          function getVersionInfo() {
+            return {
+              version: ADDON_VERSION,
+              buildDate: BUILD_DATE,
+              commitHash: COMMIT_HASH,
+              environment: "production"
+            };
+          }
+          
+          function getEnvironment() {
+            return "production";
+          }
+          EOF
+          
+      - name: Deploy to Apps Script
+        run: |
+          clasp push --force
+          DEPLOYMENT_ID=$(clasp deploy --description "Deployment $(date) - ${{ github.sha }}" | grep -o 'AKfycby[A-Za-z0-9_-]*')
+          echo "Deployed with ID: $DEPLOYMENT_ID"
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+          
+      - name: Update deployment info
+        run: |
+          echo "Deployment completed at $(date)"
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Commit: ${{ github.sha }}"
+          echo "Add-on URL: https://script.google.com/macros/d/${{ secrets.SCRIPT_ID }}/edit"
