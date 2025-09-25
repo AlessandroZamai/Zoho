@@ -4,7 +4,9 @@
 
 The Zoho webhook is designed to capture lead information and send it to Zoho CRM.
 
-# **Dealer \- Approval Process**
+# **Dealer** 
+
+## **Approval Process**
 
 To access the Zoho webhook please follow the below process:
 
@@ -20,9 +22,11 @@ To access the Zoho webhook please follow the below process:
 * Technical inquiries can be sent to [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com)  
 * Non-technical or program related questions can be sent to [DLR-BOB@telus.com](mailto:DLR-BOB@telus.com)
 
-# **Dealers \- How to Connect**
+## 
 
-## **Option \#1: Connect Google Sheets directly with Zoho using Google App Scripts**
+## **How to Connect**
+
+### **Option \#1:** Connect Google Sheets directly with Zoho using Google App Scripts
 
 ### **NEW: Consolidated Architecture (Recommended)**
 
@@ -53,7 +57,7 @@ The integration has been updated with a new consolidated architecture that elimi
 
 ## 
 
-## **Option \#2: Write your own code, or use a no-code platform like Zapier, N8N, or Zoho Flow**
+### **Option \#2:** Write your own code, or use a no-code platform like Zapier, N8N, or Zoho Flow
 
 - **Zapier event type** \= Webhook event type connector  
 - **Event type** \= POST  
@@ -67,41 +71,45 @@ The integration has been updated with a new consolidated architecture that elimi
 | ----- | :---- | :---- | ----- |
 | auth\_token\_name | auth\_token\_name | Email [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com) to receive your organization’s token | Yes |
 | auth\_token\_value | auth\_token\_value |  | Yes |
-| First Name | First\_Name |  | Yes |
-| Last Name | Last\_Name |  | Yes |
+| First Name | First\_Name | Customer’s first name | Yes |
+| Last Name | Last\_Name | Customer’s last name | Yes |
 | Phone | Phone | Must contain 10 digits without symbols or spaces | Yes |
-| Consent to Contact Captured | Consent\_to\_Contact\_Captured | Pass “true” for value | Yes |
+| Email | Email | Customer email | No |
+| Language Preference | Language\_Preference | Customer’s preference language.NOTE: Only accept “en-ca” and “fr-ca”. By default it is “en-ca” | No |
+| Consent to Contact Captured | Consent\_to\_Contact\_Captured | Always pass “true” | Yes |
 | Created By Email | Created\_By\_Email | Individual responsible for data source that TELUS can contact | Yes |
 | Campaign Start Date | Campaign\_Start\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
 | Campaign End Date | Campaign\_End\_Date | Date format should be yyyy-MM-dd  Ex. 2025-03-13 | Yes |
-| Quote Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
-| Campaign\_Name | Campaign\_Name |  | Yes |
+| Data\_Source | Datahub\_Src | Used to help you identify where this lead originated.  Ex. Website Lead Form or [telus.com/contact](http://telus.com/contact) | Yes |
+| Campaign\_Name | Campaign\_Name | Name of the Marketing campaign which helps reps understand the purpose for the call campaign this lead is related to | Yes |
+| Description | Description | Describe what you want your sales reps to know about this lead or marketing campaign. Information passed in this field is also saved as a Note. To add new line use “\\n” Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
+| Quote ID | Quote\_ID | Field to store quotes, order numbers etc. | No |
 | OrgTypeCode | OrgTypeCode | The values would be KI, DL, RT.KI \= CorporateDL \= DealerRT \= Mobile Klinik | Yes |
-| Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
+| Organization\_Code | Organization\_Code | The organization code.  Ex. 50080 is the code for Corporate Stores | Yes |
 | Street | Street |  | No |
 | City | City |  | No |
-| Province | State |  | No |
+| Province | *~~Use both together~~*~~Province~~State | Short code  Ex. ON, BC, QC | No |
 | Postal Code | Zip\_Code | 6-digits can include spaces | No |
 | Country | Country |  | No |
 | Rate Plan Description | Rate\_Plan\_Description |  | No |
 | Device Model | Phone\_Model |  | No |
 | Current Provider | Brand |  | No |
-| Description | Description | Describe what you want your sales reps to know about this lead.  Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
 | Note | note | Add note to the lead. To add new line in the note use “\\n” | No |
 | notify\_record\_owner | notify\_record\_owner | Pass boolean “true” to send email notification on lead creation to record owner | No |
 | share\_with\_other\_users | share\_with\_other\_users | Pass boolean “true” to share records with other peers. Only for KI and RT. | No |
-| notify\_share\_with\_other\_users | notify\_share\_with\_other\_users | Pass boolean “true” to send email notification to all peer with whom the record is shared. | No |
+| notify\_share\_with\_other\_users | notify\_share\_with\_other\_users | Pass boolean “true” to send email notification to all peer with whom the record is shared. Only for KI and RT. | No |
 | custom\_email\_notify\_list | custom\_email\_notify\_list | Pass custom email address separated by comma to notify them | No |
 | **CORPORATE STORES** |  |  |  |
 | AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
 | AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
-| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
-| OutletId | OutletId |  |  |
+| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS hexadecimal store identifier (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
+| OutletId | OutletId | 8 digit internal CPMS Outlet IDEx. 11244213 |  |
 | **DEALERS** |  |  |  |
-| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. |
+| AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. If user is not found, record will be assigned to Dealer Admin |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
 | AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
+| Organization\_Code | Organization\_Code | You can use this to assign the record to Dealer Admin. Ex. 6789 |  |
 | **MobileKlinik** |  |  |  |
 | AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
@@ -127,6 +135,8 @@ Test webhook json body:
 "First_Name":"test apple",
 "Last_Name":"Test postman",
 "Phone":"1231231234",
+"Email":"test@example.com",
+"Language_Preference":"en-ca",
 "Rate_Plan_Description": "$55 Unlimited US/CAN",
 "Phone_Model": "samsung",
 "Consent_to_Contact_Captured": true,
