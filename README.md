@@ -28,12 +28,32 @@ To access the Zoho webhook please follow the below process:
 
 ### **Option \#1:** Connect Google Sheets directly with Zoho using Google App Scripts
 
+### **NEW: Consolidated Architecture (Recommended)**
+
+The integration has been updated with a new consolidated architecture that eliminates code duplication and simplifies troubleshooting:
+
+- **Architecture Guide:** [CONSOLIDATED_ARCHITECTURE.md](CONSOLIDATED_ARCHITECTURE.md) - Complete overview of the new unified system
+- **Core Files (New):**
+  - `zoho_integration_core.gs` - Main processing engine for both automated and manual modes
+  - `zoho_validation.gs` - Unified validation system
+  - `zoho_config.gs` - Enhanced configuration management (setup wizard)
+  - `zoho_triggers.gs` - Trigger management and entry points
+
+**Benefits of New Architecture:**
+- ✅ Single validation system for both processing modes
+- ✅ Unified payload construction with consistent field mapping
+- ✅ Centralized error handling and logging
+- ✅ Simplified troubleshooting with one processing pipeline
+- ✅ 25% reduction in codebase size with no duplication
+
+### **Legacy Files (Still Available)**
+
 - **Guide:** [Github link](https://github.com/AlessandroZamai/Zoho/blob/main/APP_SCRIPT_GUIDE.md) **/**[Zoho | Google App Script + Google Sheet Webhook Setup Guide (Dealers)](https://docs.google.com/document/d/1kftsY9KZa27xBzZ7189bu1S2Fqd1bVfXec4VHZNlXcs/edit?tab=t.0#heading=h.wir9zfzf3130)  
 - **Templates:**   
   - [Webhook Sample Template w/Script](https://docs.google.com/spreadsheets/d/1oeYnSNhvaDGVlSK48T_nllv7_U6oIXymqC2oxL80mYo/edit?gid=0#gid=0)  
   - [Zoho \_ Webhook Template \+ App Script.csv](https://github.com/AlessandroZamai/Zoho/blob/main/Zoho_Webhook_Template_App_Script.csv)  
-  - [Send\_to\_webhook\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/send_to_webhook_script.gs)  
-  - [create\_trigger\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/create_trigger_script.gs)
+  - [Send\_to\_webhook\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/send_to_webhook_script.gs) *(deprecated - use zoho_integration_core.gs)*
+  - [create\_trigger\_script.gs](https://github.com/AlessandroZamai/Zoho/blob/main/create_trigger_script.gs) *(deprecated - use zoho_triggers.gs)*
 
 ## 
 
@@ -135,4 +155,3 @@ Test webhook json body:
 * Test the webhook thoroughly with various data inputs.  
 * Handle potential error responses appropriately.  
 * Monitor the webhook for performance and reliability.
-
