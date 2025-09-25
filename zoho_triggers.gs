@@ -8,6 +8,9 @@
  * This function is automatically called when the spreadsheet is opened
  */
 function onOpen() {
+  // Always create the menu
+  createCustomMenu();
+  
   const currentMode = getCurrentProcessingMode();
   
   if (currentMode === null) {
@@ -34,18 +37,12 @@ function onOpen() {
         }
       }
       
-      // General configuration incomplete
-      SpreadsheetApp.getUi().alert(
-        'Zoho Integration Setup Required',
-        'Configuration is incomplete. Please use the TELUS Zoho Lead Integration add-on to configure your integration.\n\nGo to Extensions > TELUS Zoho Lead Integration > Settings to complete setup.',
-        SpreadsheetApp.getUi().ButtonSet.OK
-      );
+      // Show setup wizard automatically for first-time users
+      setTimeout(() => {
+        showSetupWizard();
+      }, 1000);
     }
-  } else if (currentMode === 'MANUAL') {
-    // Create menu for manual mode
-    createCustomMenu();
   }
-  // For auto mode, triggers are already set up, no menu needed
 }
 
 /**
