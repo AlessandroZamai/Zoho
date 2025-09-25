@@ -238,7 +238,7 @@ function buildZohoPayload(rowData) {
       Phone: phone,
       Email: getColumnValue(rowData, 'EMAIL'),
       Language_Preference: getColumnValue(rowData, 'PREFERRED_LANGUAGE'),
-      Datahub_Src: "Google Apps Script " + ZOHO_VERSION,
+      Datahub_Src: "Google Apps Script",
       Campaign_Name: getColumnValue(rowData, 'CAMPAIGN_NAME'),
       Description: getColumnValue(rowData, 'DESCRIPTION'),
       Street: getColumnValue(rowData, 'STREET'),

@@ -521,28 +521,11 @@ function getAssignmentName(assignment) {
  * @return {Card} Status card
  */
 function createStatusCard() {
-  const versionInfo = getVersionInfo();
   const config = getConfigurationValues();
   
   const card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader()
-      .setTitle('Integration Status')
-      .setSubtitle(`Version ${versionInfo.version}`));
-      
-  // Version section
-  const versionSection = CardService.newCardSection()
-    .setHeader('Version Information')
-    .addWidget(CardService.newKeyValue()
-      .setTopLabel('Version')
-      .setContent(versionInfo.version))
-    .addWidget(CardService.newKeyValue()
-      .setTopLabel('Environment')
-      .setContent(versionInfo.environment))
-    .addWidget(CardService.newKeyValue()
-      .setTopLabel('Build Date')
-      .setContent(new Date(versionInfo.buildDate).toLocaleDateString()));
-      
-  card.addSection(versionSection);
+      .setTitle('Integration Status'));
   
   // Configuration status
   const configSection = CardService.newCardSection()
