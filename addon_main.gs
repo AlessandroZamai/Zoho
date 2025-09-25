@@ -528,6 +528,12 @@ function createStatusCard() {
     .setHeader(CardService.newCardHeader()
       .setTitle('Integration Status')
       .setSubtitle(`Version ${versionInfo.version}`));
+  
+  // Check for updates first
+  const updateCard = createUpdateNotificationSection();
+  if (updateCard) {
+    card.addSection(updateCard);
+  }
       
   // Version section
   const versionSection = CardService.newCardSection()
@@ -560,6 +566,162 @@ function createStatusCard() {
   card.addSection(configSection);
   
   return card.build();
+}
+
+/**
+ * Create update notification section if update is available
+ * @return {CardSection|null} Update notification section or null
+ */
+function createUpdateNotificationSection() {
+  try {
+    const updateInfo = checkForUpdatesFromGitHub();
+    
+    if (!updateInfo.updateAvailable || updateInfo.error) {
+      return null; // No update needed or error occurred
+    }
+    
+    const updateSection = CardService.newCardSection()
+      .setHeader('🔄 Update Available')
+      .addWidget(CardService.newKeyValue()
+        .setTopLabel('Current Version')
+        .setContent(updateInfo.currentVersion))
+      .addWidget(CardService.newKeyValue()
+        .setTopLabel('Latest Version')
+        .setContent(updateInfo.latestVersion))
+      .addWidget(CardService.newTextParagraph()
+        .setText('A new version is available with improvements and bug fixes.'))
+      .addWidget(CardService.newButtonSet()
+        .addButton(CardService.newTextButton()
+          .setText('View Release')
+          .setOpenLink(CardService.newOpenLink()
+            .setUrl(updateInfo.releaseUrl)))
+        .addButton(CardService.newTextButton()
+          .setText('Update Guide')
+          .setOpenLink(CardService.newOpenLink()
+            .setUrl('https://github.com/AlessandroZamai/Zoho/blob/workspace-addon/UPDATE_GUIDE.md'))))
+      .addWidget(CardService.newTextButton()
+        .setText('Get Update Helper')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('showUpdateHelperCard')));
+    
+    return updateSection;
+  } catch (error) {
+    // Silently fail - don't show update section if there's an error
+    Logger.log('Error checking for updates in UI: ' + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Show update helper card
+ * @return {ActionResponse} Update helper card
+ */
+function showUpdateHelperCard() {
+  try {
+    const card = CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader()
+        .setTitle('🔄 Update Helper')
+        .setSubtitle('Get latest code from GitHub'))
+      .addSection(CardService.newCardSection()
+        .setHeader('Available Files')
+        .addWidget(CardService.newTextParagraph()
+          .setText('Select a file to get the latest code. The code will be displayed in the Apps Script logs for easy copying.'))
+        .addWidget(CardService.newButtonSet()
+          .addButton(CardService.newTextButton()
+            .setText('addon_main.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'addon_main.gs'})))
+          .addButton(CardService.newTextButton()
+            .setText('zoho_integration_core.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'zoho_integration_core.gs'}))))
+        .addWidget(CardService.newButtonSet()
+          .addButton(CardService.newTextButton()
+            .setText('zoho_validation.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'zoho_validation.gs'})))
+          .addButton(CardService.newTextButton()
+            .setText('zoho_config.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'zoho_config.gs'}))))
+        .addWidget(CardService.newButtonSet()
+          .addButton(CardService.newTextButton()
+            .setText('zoho_triggers.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'zoho_triggers.gs'})))
+          .addButton(CardService.newTextButton()
+            .setText('version.gs')
+            .setOnClickAction(CardService.newAction()
+              .setFunctionName('getFileCode')
+              .setParameters({'filename': 'version.gs'}))))
+        .addWidget(CardService.newTextButton()
+          .setText('appsscript.json')
+          .setOnClickAction(CardService.newAction()
+            .setFunctionName('getFileCode')
+            .setParameters({'filename': 'appsscript.json'}))))
+      .addSection(CardService.newCardSection()
+        .setHeader('Instructions')
+        .addWidget(CardService.newTextParagraph()
+          .setText('1. Click a file button above\n2. Check Apps Script logs (View > Logs)\n3. Copy the displayed code\n4. Paste into your file\n5. Save and test')))
+      .build();
+    
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation()
+        .pushCard(card))
+      .build();
+      
+  } catch (error) {
+    const notification = CardService.newNotification()
+      .setType(CardService.NotificationType.ERROR)
+      .setText('Error loading update helper: ' + error.message);
+      
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .build();
+  }
+}
+
+/**
+ * Get code for a specific file and log it
+ * @param {Object} e - Event object with parameters
+ * @return {ActionResponse} Response with notification
+ */
+function getFileCode(e) {
+  try {
+    const filename = e.parameters.filename;
+    const content = getLatestFileCode(filename);
+    
+    if (content) {
+      const notification = CardService.newNotification()
+        .setType(CardService.NotificationType.INFO)
+        .setText(`✅ Latest ${filename} code logged! Check View > Logs to copy it.`);
+        
+      return CardService.newActionResponseBuilder()
+        .setNotification(notification)
+        .build();
+    } else {
+      const notification = CardService.newNotification()
+        .setType(CardService.NotificationType.ERROR)
+        .setText(`❌ Failed to fetch ${filename}. Check your internet connection.`);
+        
+      return CardService.newActionResponseBuilder()
+        .setNotification(notification)
+        .build();
+    }
+  } catch (error) {
+    const notification = CardService.newNotification()
+      .setType(CardService.NotificationType.ERROR)
+      .setText('Error: ' + error.message);
+      
+    return CardService.newActionResponseBuilder()
+      .setNotification(notification)
+      .build();
+  }
 }
 
 /**
