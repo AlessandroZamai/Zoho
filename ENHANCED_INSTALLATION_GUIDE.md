@@ -253,10 +253,6 @@ After successful installation:
 3. 🚀 Deploy new version
 4. ✅ Test functionality
 
-### **Version History:**
-- **v2.0.0**: Initial enhanced release with add-on interface
-- **v1.x.x**: Legacy standalone script versions
-
 ---
 
 ## 📞 **Support and Resources**
@@ -268,7 +264,6 @@ After successful installation:
 
 **🔗 Quick Links:**
 - [GitHub Repository](https://github.com/AlessandroZ-TELUS/Zoho)
-- [Latest Release](https://github.com/AlessandroZ-TELUS/Zoho/releases/latest)
 - [Issue Tracker](https://github.com/AlessandroZ-TELUS/Zoho/issues)
 
 **📧 Contact:**
