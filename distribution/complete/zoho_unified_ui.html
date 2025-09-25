@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoho Integration Setup</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            background: #F4F4F7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4B286D 0%, #E53293 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 32px;
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            margin: 0 8px;
+            transition: all 0.3s ease;
+        }
+
+        .step-dot.active {
+            background: #4B286D;
+            transform: scale(1.2);
+        }
+
+        .step-dot.completed {
+            background: #66CC00;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4B286D;
+        }
+
+        .form-group.auto-detected {
+            position: relative;
+        }
+
+        .auto-detected-badge {
+            position: absolute;
+            top: -8px;
+            right: 8px;
+            background: #34a853;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .radio-option {
+            flex: 1;
+            min-width: 150px;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .radio-option:hover {
+            border-color: #4B286D;
+            background: #F2EFF4;
+        }
+
+        .radio-option.selected {
+            border-color: #4B286D;
+            background: #D8CBE5;
+        }
+
+        .radio-option input[type="radio"] {
+            display: none;
+        }
+
+        .radio-option .title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .radio-option .description {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #2B8000;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1F5C09;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #5f6368;
+        }
+
+        .btn-secondary:hover {
+            background: #e8eaed;
+        }
+
+        .btn:disabled {
+            background: #B3B9BE !important;
+            color: #FEFEFF !important;
+            border: 2px solid #B3B9BE !important;
+            cursor: not-allowed;
+            transform: none !important;
+            opacity: 1;
+        }
+
+        .btn:disabled:hover {
+            background: #B3B9BE !important;
+            transform: none !important;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .status-value {
+            color: #666;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .status-badge.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status-badge.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4B286D;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4B286D, #66CC00);
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zoho Integration Setup</h1>
+            <p>Configure your Google Sheets to Zoho CRM integration</p>
+        </div>
+
+        <div class="content">
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 25%"></div>
+            </div>
+
+            <!-- Step Indicators -->
+            <div class="step-indicator">
+                <div class="step-dot active" id="dot1"></div>
+                <div class="step-dot" id="dot2"></div>
+                <div class="step-dot" id="dot3"></div>
+                <div class="step-dot" id="dot4"></div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading" id="loadingState">
+                <div class="spinner"></div>
+                <p>Setting up your integration...</p>
+            </div>
+
+            <!-- Step 1: Organization Detection -->
+            <div class="step active" id="step1">
+                <h2 style="margin-bottom: 24px;">Organization Setup</h2>
+                
+                <div class="form-group" id="orgTypeGroup">
+                    <label for="organizationType">Organization Type</label>
+                    <select id="organizationType">
+                        <option value="">Select your organization type</option>
+                        <option value="KI">Corporate Store</option>
+                        <option value="DL">Dealer</option>
+                        <option value="RT">Mobile Klinik</option>
+                    </select>
+                    <div class="help-text">Choose the type that matches your TELUS organization</div>
+                </div>
+
+                <div class="form-group" id="authTokenNameGroup" style="display: none;">
+                    <label for="authTokenName">Auth Token Name</label>
+                    <input type="text" id="authTokenName" placeholder="Enter your auth token name">
+                    <div class="help-text">This will be provided by TELUS after approval</div>
+                </div>
+
+                <div class="form-group" id="authTokenValueGroup" style="display: none;">
+                    <label for="authTokenValue">Auth Token Value</label>
+                    <input type="password" id="authTokenValue" placeholder="Enter your auth token value">
+                    <div class="help-text">Keep this secure and don't share it</div>
+                </div>
+
+                <div class="form-group" id="orgCodeGroup" style="display: none;">
+                    <label for="orgCode">Organization Code</label>
+                    <input type="text" id="orgCode" placeholder="Enter your organization code" pattern="[0-9]{4,5}" maxlength="5">
+                    <div class="help-text" id="orgCodeHelp">4 or 5-digit code (remove leading zeros)</div>
+                    <div class="help-text" id="orgCodeError" style="color: #c62828; display: none;">Organization code must be 4 or 5 digits only</div>
+                </div>
+            </div>
+
+            <!-- Step 2: Processing Mode -->
+            <div class="step" id="step2">
+                <h2 style="margin-bottom: 24px;">Processing Mode</h2>
+                
+                <div class="radio-group">
+                    <div class="radio-option" onclick="selectProcessingMode('AUTO')">
+                        <input type="radio" name="processingMode" value="AUTO" id="modeAuto">
+                        <div class="title">Automated</div>
+                        <div class="description">Send data to Zoho automatically when rows are edited</div>
+                    </div>
+                    <div class="radio-option" onclick="selectProcessingMode('MANUAL')">
+                        <input type="radio" name="processingMode" value="MANUAL" id="modeManual">
+                        <div class="title">Manual</div>
+                        <div class="description">Send data using a menu button when ready</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" style="margin-top: 20px;">
+                    <strong>Recommendation:</strong> Choose Automated for real-time processing or Manual for batch processing with review.
+                </div>
+            </div>
+
+            <!-- Step 3: Campaign Settings -->
+            <div class="step" id="step3">
+                <h2 style="margin-bottom: 24px;">Campaign Settings</h2>
+                
+                <!-- Manual Processing Mode UI -->
+                <div id="manualCampaignSettings" style="display: none;">
+                    <div class="form-group">
+                        <label for="campaignStartDate">Campaign Start Date</label>
+                        <input type="date" id="campaignStartDate">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campaignEndDate">Campaign End Date</label>
+                        <input type="date" id="campaignEndDate">
+                    </div>
+
+                    <div class="alert alert-info" style="margin-top: 20px;">
+                        <strong>Example campaign durations:</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li>10 days - Hot leads (ex. quoting tools)</li>
+                            <li>30 days - Marketing leads</li>
+                            <li>90 days - Rep generated leads</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Automated Processing Mode UI -->
+                <div id="automatedCampaignSettings" style="display: none;">
+                    <div class="form-group">
+                        <label for="campaignDuration">Campaign Duration (days)</label>
+                        <input type="number" id="campaignDuration" min="1" max="365" value="30" placeholder="Enter number of days">
+                        <div class="help-text">How many days should each campaign last?</div>
+                    </div>
+
+                    <div class="alert alert-info" id="campaignExample" style="margin-top: 20px;">
+                        <strong>Campaign Example (based on today's date):</strong>
+                        <p id="campaignExampleText" style="margin-top: 8px;">If a row is processed today, the campaign will run from today to 30 days from now.</p>
+                        <p style="margin-top: 8px; font-style: italic;">Start date adjusts dynamically based on when each row is processed</p>
+                    </div>
+
+                    <div class="alert alert-info" style="margin-top: 20px;">
+                        <strong>Recommended campaign durations:</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li>10 days - Hot leads (ex. quoting tools)</li>
+                            <li>30 days - Marketing leads</li>
+                            <li>90 days - Rep generated leads</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Lead Assignment Strategy -->
+            <div class="step" id="step4">
+                <h2 style="margin-bottom: 24px;">Lead Assignment Strategy</h2>
+                
+                <div class="radio-group" id="leadAssignmentOptions">
+                    <!-- Options will be populated dynamically based on organization type -->
+                </div>
+            </div>
+
+            <!-- Success Step -->
+            <div class="step" id="stepSuccess">
+                <div class="alert alert-success">
+                    <h3 style="margin-bottom: 12px;">✅ Setup Complete!</h3>
+                    <p>Your Zoho integration has been configured successfully.</p>
+                </div>
+
+                <div class="status-card" id="finalStatus">
+                    <!-- Status will be populated by JavaScript -->
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Next Steps:</strong>
+                    <ul style="margin-top: 8px; margin-left: 20px;">
+                        <li>Your spreadsheet template has been updated</li>
+                        <li id="nextStepProcessing">Processing mode configured</li>
+                        <li>You can now start using the integration</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Date Confirmation Step -->
+            <div class="step" id="stepDateConfirmation">
+                <h2 style="margin-bottom: 24px;">📅 Campaign Date Confirmation</h2>
+                
+                <div class="alert alert-info">
+                    <strong>Notice:</strong> Your campaign dates are different from today's date. Please confirm or update the campaign dates before processing.
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmStartDate">Campaign Start Date:</label>
+                    <input type="date" id="confirmStartDate">
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmEndDate">Campaign End Date:</label>
+                    <input type="date" id="confirmEndDate">
+                </div>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="button-group">
+                <button class="btn btn-secondary" id="prevBtn" onclick="previousStep()" style="display: none;">Previous</button>
+                <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next</button>
+                <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()" style="display: none;">Finish</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let configData = {};
+        let selectedProcessingMode = null;
+        let selectedLeadAssignment = null;
+
+        // Initialize the form
+        document.addEventListener('DOMContentLoaded', function() {
+            setDefaultDates();
+            setupEventListeners();
+        });
+
+        function setDefaultDates() {
+            const today = new Date();
+            const startDate = today.toISOString().split('T')[0];
+            
+            const endDate = new Date(today);
+            endDate.setDate(endDate.getDate() + 30);
+            const endDateStr = endDate.toISOString().split('T')[0];
+            
+            document.getElementById('campaignStartDate').value = startDate;
+            document.getElementById('campaignEndDate').value = endDateStr;
+        }
+
+        function setupEventListeners() {
+            // Listen for organization type selection changes
+            document.getElementById('organizationType').addEventListener('change', function() {
+                handleOrganizationTypeChange();
+            });
+            
+            // Listen for input changes to update button state
+            document.getElementById('authTokenName').addEventListener('input', updateButtonState);
+            document.getElementById('authTokenValue').addEventListener('input', updateButtonState);
+            document.getElementById('orgCode').addEventListener('input', function() {
+                validateOrgCodeInput();
+                updateButtonState();
+            });
+            document.getElementById('campaignStartDate').addEventListener('change', updateButtonState);
+            document.getElementById('campaignEndDate').addEventListener('change', updateButtonState);
+            document.getElementById('campaignDuration').addEventListener('input', updateButtonState);
+            
+            // Initial button state
+            updateButtonState();
+        }
+
+        function handleOrganizationTypeChange() {
+            const organizationType = document.getElementById('organizationType').value;
+            const orgCodeGroup = document.getElementById('orgCodeGroup');
+            const orgCodeInput = document.getElementById('orgCode');
+            const orgCodeHelp = document.getElementById('orgCodeHelp');
+            const authTokenNameGroup = document.getElementById('authTokenNameGroup');
+            const authTokenValueGroup = document.getElementById('authTokenValueGroup');
+            
+            if (organizationType === 'KI') {
+                // Corporate Store - hide auth token fields, set predefined code
+                authTokenNameGroup.style.display = 'none';
+                authTokenValueGroup.style.display = 'none';
+                orgCodeInput.value = '50080';
+                orgCodeInput.disabled = true;
+                orgCodeInput.style.backgroundColor = '#f5f5f5';
+                orgCodeInput.style.color = '#9aa0a6';
+                orgCodeHelp.textContent = 'Organization code automatically set for Corporate Store';
+                orgCodeGroup.style.display = 'block';
+            } else if (organizationType === 'RT') {
+                // Mobile Klinik - hide auth token fields, set predefined code
+                authTokenNameGroup.style.display = 'none';
+                authTokenValueGroup.style.display = 'none';
+                orgCodeInput.value = '6675';
+                orgCodeInput.disabled = true;
+                orgCodeInput.style.backgroundColor = '#f5f5f5';
+                orgCodeInput.style.color = '#9aa0a6';
+                orgCodeHelp.textContent = 'Organization code automatically set for Mobile Klinik';
+                orgCodeGroup.style.display = 'block';
+            } else if (organizationType === 'DL') {
+                // Dealer - show auth token fields, enable org code input
+                authTokenNameGroup.style.display = 'block';
+                authTokenValueGroup.style.display = 'block';
+                orgCodeInput.value = '';
+                orgCodeInput.disabled = false;
+                orgCodeInput.style.backgroundColor = '#ffffff';
+                orgCodeInput.style.color = '#000000';
+                orgCodeHelp.textContent = '4 or 5-digit code (remove leading zeros)';
+                orgCodeGroup.style.display = 'block';
+            } else {
+                // No selection - hide auth token fields and org code group
+                authTokenNameGroup.style.display = 'none';
+                authTokenValueGroup.style.display = 'none';
+                orgCodeGroup.style.display = 'none';
+            }
+            
+            // Clear any existing error states when switching organization types
+            const orgCodeError = document.getElementById('orgCodeError');
+            orgCodeError.style.display = 'none';
+            orgCodeInput.style.borderColor = '#e0e0e0';
+            
+            // Update lead assignment options based on organization type
+            updateLeadAssignmentOptions(organizationType);
+            
+            // Update button state
+            updateButtonState();
+        }
+        
+        function validateOrgCodeInput() {
+            const orgCodeInput = document.getElementById('orgCode');
+            const orgCodeError = document.getElementById('orgCodeError');
+            const orgCode = orgCodeInput.value;
+            
+            // Only validate if the field is enabled (not disabled for Corporate Store/Mobile Klinik)
+            if (!orgCodeInput.disabled) {
+                if (orgCode && !/^\d{4,5}$/.test(orgCode)) {
+                    // Show error message
+                    orgCodeError.style.display = 'block';
+                    orgCodeInput.style.borderColor = '#c62828';
+                } else {
+                    // Hide error message
+                    orgCodeError.style.display = 'none';
+                    orgCodeInput.style.borderColor = '#e0e0e0';
+                }
+            }
+        }
+
+        function updateLeadAssignmentOptions(organizationType) {
+            // This function is for the old dropdown that no longer exists
+            // The new implementation uses radio buttons in Step 4
+            // So we can safely remove this function's content
+        }
+
+        function selectProcessingMode(mode) {
+            selectedProcessingMode = mode;
+            
+            // Update UI
+            document.querySelectorAll('#step2 .radio-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            event.currentTarget.classList.add('selected');
+            document.getElementById('mode' + mode.charAt(0) + mode.slice(1).toLowerCase()).checked = true;
+            
+            // Update button state
+            updateButtonState();
+        }
+
+        function selectLeadAssignment(assignment) {
+            selectedLeadAssignment = assignment;
+            
+            // Update UI
+            document.querySelectorAll('#step4 .radio-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            event.currentTarget.classList.add('selected');
+            
+            // Update button state
+            updateButtonState();
+        }
+
+        function setupCampaignSettings() {
+            const manualSettings = document.getElementById('manualCampaignSettings');
+            const automatedSettings = document.getElementById('automatedCampaignSettings');
+            
+            if (selectedProcessingMode === 'MANUAL') {
+                // Show manual mode UI
+                manualSettings.style.display = 'block';
+                automatedSettings.style.display = 'none';
+            } else if (selectedProcessingMode === 'AUTO') {
+                // Show automated mode UI
+                manualSettings.style.display = 'none';
+                automatedSettings.style.display = 'block';
+                
+                // Set up campaign duration listener and initial calculation
+                const durationInput = document.getElementById('campaignDuration');
+                durationInput.addEventListener('input', updateCampaignExample);
+                
+                // Calculate initial example
+                updateCampaignExample();
+            }
+        }
+
+        function updateCampaignExample() {
+            const duration = parseInt(document.getElementById('campaignDuration').value) || 30;
+            const today = new Date();
+            const endDate = new Date(today);
+            endDate.setDate(endDate.getDate() + duration);
+            
+            const startDateStr = today.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            const endDateStr = endDate.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            const exampleText = document.getElementById('campaignExampleText');
+            exampleText.textContent = `If a row is processed today (${startDateStr}), the campaign will run from ${startDateStr} to ${endDateStr}.`;
+        }
+
+        function populateLeadAssignmentOptions() {
+            const organizationType = document.getElementById('organizationType').value;
+            const optionsContainer = document.getElementById('leadAssignmentOptions');
+            
+            // Clear existing options
+            optionsContainer.innerHTML = '';
+            
+            if (organizationType === 'DL') {
+                // Dealer options: Admin Assignment and Sales Rep Assignment
+                optionsContainer.innerHTML = `
+                    <div class="radio-option" onclick="selectLeadAssignment('ADMIN')">
+                        <input type="radio" name="leadAssignment" value="ADMIN" id="assignmentAdmin">
+                        <div class="title">Admin Assignment</div>
+                        <div class="description">All leads assigned to your Zoho Admin</div>
+                    </div>
+                    <div class="radio-option" onclick="selectLeadAssignment('Sales_Rep')">
+                        <input type="radio" name="leadAssignment" value="Sales_Rep" id="assignmentManual">
+                        <div class="title">Sales Rep Assignment</div>
+                        <div class="description">Leads will be assigned to a specific sales rep based on the sales rep email you enter in each row</div>
+                    </div>
+                `;
+                // No default selection - user must choose
+                selectedLeadAssignment = null;
+            } else if (organizationType === 'KI' || organizationType === 'RT') {
+                // Corporate Store and Mobile Klinik options: Sales Rep Assignment and Store Assignment
+                optionsContainer.innerHTML = `
+                    <div class="radio-option" onclick="selectLeadAssignment('Sales_Rep')">
+                        <input type="radio" name="leadAssignment" value="Sales_Rep" id="assignmentManual">
+                        <div class="title">Sales Rep Assignment</div>
+                        <div class="description">Leads will be assigned to a specific sales rep based on the sales rep email you enter in each row</div>
+                    </div>
+                    <div class="radio-option" onclick="selectLeadAssignment('Store')">
+                        <input type="radio" name="leadAssignment" value="Store" id="assignmentEqual">
+                        <div class="title">Store Assignment</div>
+                        <div class="description">Leads are equally distributed to sales reps working at a specific store based on the Channel Outlet ID you enter in each row</div>
+                    </div>
+                `;
+                // No default selection - user must choose
+                selectedLeadAssignment = null;
+            }
+            
+            // Update button state
+            updateButtonState();
+        }
+
+        function updateButtonState() {
+            const nextBtn = document.getElementById('nextBtn');
+            let isValid = false;
+            
+            switch (currentStep) {
+                case 1:
+                    const organizationType = document.getElementById('organizationType').value;
+                    
+                    if (!organizationType) {
+                        isValid = false;
+                    } else if (organizationType === 'DL') {
+                        // Dealer - check all required fields
+                        const authTokenName = document.getElementById('authTokenName').value;
+                        const authTokenValue = document.getElementById('authTokenValue').value;
+                        const orgCode = document.getElementById('orgCode').value;
+                        // Validate organization code format
+                        const isValidOrgCode = orgCode && /^\d{4,5}$/.test(orgCode);
+                        isValid = authTokenName && authTokenValue && isValidOrgCode;
+                    } else if (organizationType === 'KI' || organizationType === 'RT') {
+                        // Corporate Store or Mobile Klinik - only organization type needed
+                        isValid = true;
+                    }
+                    break;
+                    
+                case 2:
+                    isValid = selectedProcessingMode !== null;
+                    break;
+                    
+                case 3:
+                    if (selectedProcessingMode === 'MANUAL') {
+                        // Manual mode validation
+                        const startDate = document.getElementById('campaignStartDate').value;
+                        const endDate = document.getElementById('campaignEndDate').value;
+                        isValid = startDate && endDate && new Date(endDate) > new Date(startDate);
+                    } else if (selectedProcessingMode === 'AUTO') {
+                        // Automated mode validation
+                        const duration = parseInt(document.getElementById('campaignDuration').value);
+                        isValid = duration && duration >= 1 && duration <= 365;
+                    }
+                    break;
+                    
+                case 4:
+                    isValid = selectedLeadAssignment !== null;
+                    break;
+                    
+                default:
+                    isValid = true;
+            }
+            
+            nextBtn.disabled = !isValid;
+        }
+
+        function nextStep() {
+            if (validateCurrentStep()) {
+                if (currentStep < 4) {
+                    currentStep++;
+                    // Handle step-specific setup
+                    if (currentStep === 3) {
+                        setupCampaignSettings();
+                    } else if (currentStep === 4) {
+                        populateLeadAssignmentOptions();
+                    }
+                    updateStepDisplay();
+                } else {
+                    // Final step - save configuration
+                    saveConfiguration();
+                }
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepDisplay();
+            }
+        }
+
+        function validateCurrentStep() {
+            switch (currentStep) {
+                case 1:
+                    const authTokenName = document.getElementById('authTokenName').value;
+                    const authTokenValue = document.getElementById('authTokenValue').value;
+                    const organizationType = document.getElementById('organizationType').value;
+                    
+                    if (!organizationType) {
+                        alert('Please select your organization type.');
+                        return false;
+                    }
+                    
+                    // Only validate auth tokens for dealers
+                    if (organizationType === 'DL') {
+                        if (!authTokenName || !authTokenValue) {
+                            alert('Please enter both auth token name and value.');
+                            return false;
+                        }
+                        
+                        const orgCode = document.getElementById('orgCode').value;
+                        if (!orgCode) {
+                            alert('Please enter your organization code.');
+                            return false;
+                        }
+                        
+                        // Validate organization code format
+                        if (!/^\d{4,5}$/.test(orgCode)) {
+                            alert('Organization code must be 4 or 5 digits only.');
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                    
+                case 2:
+                    if (!selectedProcessingMode) {
+                        alert('Please select a processing mode.');
+                        return false;
+                    }
+                    return true;
+                    
+                case 3:
+                    if (selectedProcessingMode === 'MANUAL') {
+                        // Manual mode validation
+                        const startDate = document.getElementById('campaignStartDate').value;
+                        const endDate = document.getElementById('campaignEndDate').value;
+                        
+                        if (!startDate || !endDate) {
+                            alert('Please select both campaign start and end dates.');
+                            return false;
+                        }
+                        
+                        if (new Date(endDate) <= new Date(startDate)) {
+                            alert('Campaign end date must be after start date.');
+                            return false;
+                        }
+                    } else if (selectedProcessingMode === 'AUTO') {
+                        // Automated mode validation
+                        const duration = parseInt(document.getElementById('campaignDuration').value);
+                        
+                        if (!duration || duration < 1 || duration > 365) {
+                            alert('Please enter a valid campaign duration between 1 and 365 days.');
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                    
+                case 4:
+                    if (!selectedLeadAssignment) {
+                        alert('Please select a lead assignment strategy.');
+                        return false;
+                    }
+                    return true;
+                    
+                default:
+                    return true;
+            }
+        }
+
+        function updateStepDisplay() {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            // Show current step
+            document.getElementById('step' + currentStep).classList.add('active');
+            
+            // Update step indicators
+            document.querySelectorAll('.step-dot').forEach((dot, index) => {
+                dot.classList.remove('active', 'completed');
+                if (index + 1 < currentStep) {
+                    dot.classList.add('completed');
+                } else if (index + 1 === currentStep) {
+                    dot.classList.add('active');
+                }
+            });
+            
+            // Update progress bar
+            const progress = (currentStep / 4) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+            
+            // Update navigation buttons
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+            nextBtn.textContent = currentStep === 4 ? 'Complete Setup' : 'Next';
+        }
+
+        function saveConfiguration() {
+            // Show loading state
+            showLoading();
+            
+            // Collect configuration data based on processing mode
+            configData = {
+                authTokenName: document.getElementById('authTokenName').value,
+                authTokenValue: document.getElementById('authTokenValue').value,
+                organizationType: document.getElementById('organizationType').value,
+                orgCode: document.getElementById('orgCode').value || null,
+                processingMode: selectedProcessingMode,
+                leadAssignment: selectedLeadAssignment
+            };
+            
+            // Add campaign data based on processing mode
+            if (selectedProcessingMode === 'MANUAL') {
+                configData.campaignStartDate = document.getElementById('campaignStartDate').value;
+                configData.campaignEndDate = document.getElementById('campaignEndDate').value;
+            } else if (selectedProcessingMode === 'AUTO') {
+                configData.campaignDuration = parseInt(document.getElementById('campaignDuration').value);
+                // For automated mode, dates will be calculated at processing time
+                configData.campaignStartDate = null;
+                configData.campaignEndDate = null;
+            }
+            
+            // Call Google Apps Script function
+            google.script.run
+                .withSuccessHandler(onConfigurationSaved)
+                .withFailureHandler(onConfigurationError)
+                .saveCompleteConfiguration(configData);
+        }
+
+        function onConfigurationSaved(result) {
+            hideLoading();
+            
+            if (result.success) {
+                showSuccessStep();
+            } else {
+                alert('Configuration failed: ' + result.message);
+            }
+        }
+
+        function onConfigurationError(error) {
+            hideLoading();
+            alert('Error saving configuration: ' + error.toString());
+        }
+
+        function showSuccessStep() {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            // Show success step
+            document.getElementById('stepSuccess').classList.add('active');
+            
+            // Update step indicators
+            document.querySelectorAll('.step-dot').forEach(dot => {
+                dot.classList.remove('active');
+                dot.classList.add('completed');
+            });
+            
+            // Update progress bar
+            document.getElementById('progressFill').style.width = '100%';
+            
+            // Update navigation buttons
+            document.getElementById('prevBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('finishBtn').style.display = 'block';
+            
+            // Populate final status
+            populateFinalStatus();
+        }
+
+        function populateFinalStatus() {
+            const statusCard = document.getElementById('finalStatus');
+            const orgTypeNames = {
+                'KI': 'Corporate Store',
+                'DL': 'Dealer',
+                'RT': 'Mobile Klinik'
+            };
+            
+            const processingModeNames = {
+                'AUTO': 'Automated',
+                'MANUAL': 'Manual'
+            };
+            
+            statusCard.innerHTML = `
+                <div class="status-item">
+                    <span class="status-label">Organization Type:</span>
+                    <span class="status-value">${orgTypeNames[configData.organizationType]}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Processing Mode:</span>
+                    <span class="status-badge success">${processingModeNames[configData.processingMode]}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Campaign Period:</span>
+                    <span class="status-value">${configData.campaignStartDate} to ${configData.campaignEndDate}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Lead Assignment:</span>
+                    <span class="status-value">${configData.leadAssignment}</span>
+                </div>
+            `;
+            
+            // Update next step text
+            const nextStepText = 'Use the "Send to Zoho" menu to change settings or manual leads';
+            
+            document.getElementById('nextStepProcessing').textContent = nextStepText;
+        }
+
+        function showLoading() {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById('loadingState').classList.add('active');
+            document.getElementById('nextBtn').disabled = true;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').classList.remove('active');
+            document.getElementById('nextBtn').disabled = false;
+        }
+
+        function finishSetup() {
+            google.script.host.close();
+        }
+
+        // Date Confirmation Functions
+        function showDateConfirmationStep() {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            // Show date confirmation step
+            document.getElementById('stepDateConfirmation').classList.add('active');
+            
+            // Update navigation buttons for date confirmation
+            document.getElementById('prevBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('finishBtn').style.display = 'none';
+            
+            // Add date confirmation buttons
+            const buttonGroup = document.querySelector('.button-group');
+            buttonGroup.innerHTML = `
+                <button class="btn btn-secondary" onclick="cancelDateConfirmation()">Cancel</button>
+                <button class="btn btn-primary" onclick="updateAndContinue()" id="updateBtn">Update & Continue</button>
+            `;
+            
+            // Load current dates
+            loadCurrentDates();
+        }
+
+        function loadCurrentDates() {
+            google.script.run
+                .withSuccessHandler(onDatesLoaded)
+                .withFailureHandler(onError)
+                .getExistingConfiguration();
+        }
+
+        function onDatesLoaded(config) {
+            if (config.campaignStartDate) {
+                document.getElementById('confirmStartDate').value = config.campaignStartDate;
+            }
+            if (config.campaignEndDate) {
+                document.getElementById('confirmEndDate').value = config.campaignEndDate;
+            }
+        }
+
+        function updateAndContinue() {
+            const startDate = document.getElementById('confirmStartDate').value;
+            const endDate = document.getElementById('confirmEndDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates.');
+                return;
+            }
+            
+            if (new Date(endDate) <= new Date(startDate)) {
+                alert('End date must be after start date.');
+                return;
+            }
+            
+            // Disable button to prevent double-clicks
+            document.getElementById('updateBtn').disabled = true;
+            
+            google.script.run
+                .withSuccessHandler(onUpdateSuccess)
+                .withFailureHandler(onError)
+                .updateCampaignDatesAndContinue(startDate, endDate);
+        }
+
+        function onUpdateSuccess(result) {
+            if (result.success) {
+                google.script.host.close();
+            } else {
+                alert('Error updating dates: ' + result.message);
+                document.getElementById('updateBtn').disabled = false;
+            }
+        }
+
+        function onError(error) {
+            alert('Error: ' + error.message);
+            if (document.getElementById('updateBtn')) {
+                document.getElementById('updateBtn').disabled = false;
+            }
+        }
+
+        function cancelDateConfirmation() {
+            google.script.host.close();
+        }
+    </script>
+</body>
+</html>
