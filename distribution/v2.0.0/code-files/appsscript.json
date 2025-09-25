@@ -1,14 +1,5 @@
 {
   "timeZone": "America/Toronto",
-  "dependencies": {
-    "enabledAdvancedServices": [
-      {
-        "userSymbol": "Sheets",
-        "serviceId": "sheets",
-        "version": "v4"
-      }
-    ]
-  },
   "addOns": {
     "common": {
       "name": "TELUS Zoho Lead Integration",

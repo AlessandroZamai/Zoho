@@ -34,14 +34,13 @@ This guide provides step-by-step instructions for installing the TELUS Zoho Lead
 3. 📝 Rename project to: **"TELUS Zoho Lead Integration"**
 4. 💾 Click **"Save"**
 
-### **Step 2: Configure Project Settings** (3 minutes)
+### **Step 2: Configure Project Settings** (1 minute)
 
 1. ⚙️ Click the **gear icon** (Project Settings) in the left sidebar
-2. 🔧 Scroll to **"Google Cloud Platform (GCP) Project"**
-3. 📋 Enter project number: **`371880869452`**
-4. ✅ Click **"Set Project"**
-5. ✅ Check **"Show 'appsscript.json' manifest file in editor"**
-6. 🔙 Return to **"Editor"** tab
+2. ✅ Check **"Show 'appsscript.json' manifest file in editor"**
+3. 🔙 Return to **"Editor"** tab
+
+**📝 Note**: No GCP project setup required! This integration works with the default Google Apps Script environment.
 
 ### **Step 3: Copy Code Files** (8 minutes)
 
@@ -55,15 +54,6 @@ This guide provides step-by-step instructions for installing the TELUS Zoho Lead
 ```json
 {
   "timeZone": "America/Toronto",
-  "dependencies": {
-    "enabledAdvancedServices": [
-      {
-        "userSymbol": "Sheets",
-        "serviceId": "sheets",
-        "version": "v4"
-      }
-    ]
-  },
   "addOns": {
     "common": {
       "name": "TELUS Zoho Lead Integration",
@@ -230,7 +220,7 @@ After successful installation:
 **❌ "Authorization required" errors:**
 - ✅ Run any function once to trigger authorization
 - ✅ Grant all requested permissions
-- ✅ Check GCP project number is correct
+- ✅ Refresh the page and try again
 
 **❌ Add-on doesn't appear in Extensions menu:**
 - ✅ Verify deployment was successful
