@@ -4,7 +4,9 @@
 
 The Zoho webhook is designed to capture lead information and send it to Zoho CRM.
 
-# **Dealer \- Approval Process**
+# **Dealer** 
+
+## **Approval Process**
 
 To access the Zoho webhook please follow the below process:
 
@@ -20,9 +22,11 @@ To access the Zoho webhook please follow the below process:
 * Technical inquiries can be sent to [dltrlzohodev@telus.com](mailto:dltrlzohodev@telus.com)  
 * Non-technical or program related questions can be sent to [DLR-BOB@telus.com](mailto:DLR-BOB@telus.com)
 
-# **Dealers \- How to Connect**
+## 
 
-## **Option \#1: Connect Google Sheets directly with Zoho using Google App Scripts**
+## **How to Connect**
+
+### **Option \#1:** Connect Google Sheets directly with Zoho using Google App Scripts
 
 - **Guide:** [Github link](https://github.com/AlessandroZamai/Zoho/blob/main/APP_SCRIPT_GUIDE.md) **/**[Zoho | Google App Script + Google Sheet Webhook Setup Guide (Dealers)](https://docs.google.com/document/d/1kftsY9KZa27xBzZ7189bu1S2Fqd1bVfXec4VHZNlXcs/edit?tab=t.0#heading=h.wir9zfzf3130)  
 - **Templates:**   
@@ -33,7 +37,7 @@ To access the Zoho webhook please follow the below process:
 
 ## 
 
-## **Option \#2: Write your own code, or use a no-code platform like Zapier, N8N, or Zoho Flow**
+### **Option \#2:** Write your own code, or use a no-code platform like Zapier, N8N, or Zoho Flow
 
 - **Zapier event type** \= Webhook event type connector  
 - **Event type** \= POST  
@@ -61,10 +65,10 @@ To access the Zoho webhook please follow the below process:
 | Description | Description | Describe what you want your sales reps to know about this lead or marketing campaign. Information passed in this field is also saved as a Note. To add new line use “\\n” Ex. “Customer requested a sales callback on [telus.com/contact](http://telus.com/contact). Callback within 48 hours.” | No |
 | Quote ID | Quote\_ID | Field to store quotes, order numbers etc. | No |
 | OrgTypeCode | OrgTypeCode | The values would be KI, DL, RT.KI \= CorporateDL \= DealerRT \= Mobile Klinik | Yes |
-| Organization\_Code | Organization\_Code | The organization code. For example the for corporate it’s “50080” | Yes |
+| Organization\_Code | Organization\_Code | The organization code.  Ex. 50080 is the code for Corporate Stores | Yes |
 | Street | Street |  | No |
 | City | City |  | No |
-| Province | Province | Short code like ON, BC, QC | No |
+| Province | *~~Use both together~~*~~Province~~State | Short code  Ex. ON, BC, QC | No |
 | Postal Code | Zip\_Code | 6-digits can include spaces | No |
 | Country | Country |  | No |
 | Rate Plan Description | Rate\_Plan\_Description |  | No |
@@ -79,8 +83,8 @@ To access the Zoho webhook please follow the below process:
 | AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 |  Yes \- Only pass one of these fields. |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
 | AssignToSalesRepEmail | AssignToSalesRepEmail | You can use this to assign the record directly to the specific user. The email address must be associated with an active user in Zoho CRM. Ex. sample@telus.com |  |
-| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS value associated with a store (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
-| OutletId | OutletId |  |  |
+| ChannelOutletId | ChannelOutletId\_Updated | 10 character CPMS hexadecimal store identifier (add leading zeros if less than 10 characters long) Ex. 0000612342 |  |
+| OutletId | OutletId | 8 digit internal CPMS Outlet IDEx. 11244213 |  |
 | **DEALERS** |  |  |  |
 | AssignToSalesRepUserID | AssignToSalesRepUserID | Zoho CRM User ID, If you don’t know how to get it, you can contact zoho admin. You can use this to assign the record directly to the specific user Ex. 5877708000022044043 | Yes \- Only pass one of these fields. If user is not found, record will be assigned to Dealer Admin |
 | SalesRepPin | SalesRepPin | You can use this to assign the record directly to the specific user Ex. HX1T |  |
