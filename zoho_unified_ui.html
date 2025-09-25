@@ -349,6 +349,69 @@
             transition: width 0.3s ease;
         }
 
+        .field-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .field-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .field-option:hover {
+            border-color: #4B286D;
+            background: #F2EFF4;
+        }
+
+        .field-option.selected {
+            border-color: #4B286D;
+            background: #D8CBE5;
+        }
+
+        .field-option.required {
+            background: #fff3e0;
+            border-color: #ff9800;
+            cursor: not-allowed;
+            position: relative;
+        }
+
+        .field-option.required::before {
+            content: "REQUIRED";
+            position: absolute;
+            top: -8px;
+            right: 8px;
+            background: #ff9800;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .field-option input[type="checkbox"] {
+            margin-right: 12px;
+            transform: scale(1.2);
+        }
+
+        .field-option .field-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .field-option.required .field-name {
+            color: #e65100;
+            font-weight: 600;
+        }
+
         @media (max-width: 480px) {
             .container {
                 margin: 10px;
@@ -364,6 +427,10 @@
             
             .button-group {
                 flex-direction: column;
+            }
+
+            .field-group {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -387,6 +454,7 @@
                 <div class="step-dot" id="dot2"></div>
                 <div class="step-dot" id="dot3"></div>
                 <div class="step-dot" id="dot4"></div>
+                <div class="step-dot" id="dot5"></div>
             </div>
 
             <!-- Loading State -->
@@ -430,30 +498,51 @@
                 </div>
             </div>
 
-            <!-- Step 2: Processing Mode -->
+            <!-- Step 2: Field Selection -->
             <div class="step" id="step2">
+                <h2 style="margin-bottom: 24px;">Field Selection</h2>
+                
+                <div class="alert alert-info" style="margin-bottom: 20px;">
+                    <strong>Select Fields:</strong> Choose which fields you want to include in your spreadsheet. Required fields are pre-selected and cannot be removed.
+                </div>
+                
+                <div id="fieldSelectionContainer">
+                    <h3 style="margin-bottom: 16px; color: #333;">Required Fields</h3>
+                    <div id="requiredFields" class="field-group">
+                        <!-- Required fields will be populated here -->
+                    </div>
+                    
+                    <h3 style="margin-bottom: 16px; margin-top: 24px; color: #333;">Optional Fields</h3>
+                    <div id="optionalFields" class="field-group">
+                        <!-- Optional fields will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Processing Mode -->
+            <div class="step" id="step3">
                 <h2 style="margin-bottom: 24px;">Processing Mode</h2>
                 
                 <div class="radio-group">
-                    <div class="radio-option" onclick="selectProcessingMode('AUTO')">
-                        <input type="radio" name="processingMode" value="AUTO" id="modeAuto">
-                        <div class="title">Automated</div>
-                        <div class="description">Send data to Zoho automatically when rows are edited</div>
+                    <div class="radio-option disabled" style="opacity: 0.5; cursor: not-allowed;">
+                        <input type="radio" name="processingMode" value="AUTO" id="modeAuto" disabled>
+                        <div class="title">Automated (Disabled)</div>
+                        <div class="description">Automated processing is currently disabled</div>
                     </div>
-                    <div class="radio-option" onclick="selectProcessingMode('MANUAL')">
-                        <input type="radio" name="processingMode" value="MANUAL" id="modeManual">
+                    <div class="radio-option selected" onclick="selectProcessingMode('MANUAL')">
+                        <input type="radio" name="processingMode" value="MANUAL" id="modeManual" checked>
                         <div class="title">Manual</div>
                         <div class="description">Send data using a menu button when ready</div>
                     </div>
                 </div>
 
                 <div class="alert alert-info" style="margin-top: 20px;">
-                    <strong>Recommendation:</strong> Choose Automated for real-time processing or Manual for batch processing with review.
+                    <strong>Note:</strong> Manual processing mode is selected by default. Automated processing is currently disabled.
                 </div>
             </div>
 
-            <!-- Step 3: Campaign Settings -->
-            <div class="step" id="step3">
+            <!-- Step 4: Campaign Settings -->
+            <div class="step" id="step4">
                 <h2 style="margin-bottom: 24px;">Campaign Settings</h2>
                 
                 <!-- Manual Processing Mode UI -->
@@ -503,8 +592,8 @@
                 </div>
             </div>
 
-            <!-- Step 4: Lead Assignment Strategy -->
-            <div class="step" id="step4">
+            <!-- Step 5: Lead Assignment Strategy -->
+            <div class="step" id="step5">
                 <h2 style="margin-bottom: 24px;">Lead Assignment Strategy</h2>
                 
                 <div class="radio-group" id="leadAssignmentOptions">
@@ -566,11 +655,17 @@
         let configData = {};
         let selectedProcessingMode = null;
         let selectedLeadAssignment = null;
+        let selectedFields = [];
 
         // Initialize the form
         document.addEventListener('DOMContentLoaded', function() {
             setDefaultDates();
             setupEventListeners();
+            loadAvailableFields();
+            // Set default processing mode since MANUAL is pre-selected
+            selectedProcessingMode = 'MANUAL';
+            // Load existing configuration to pre-populate form
+            loadExistingConfiguration();
         });
 
         function setDefaultDates() {
@@ -706,12 +801,22 @@
         function selectLeadAssignment(assignment) {
             selectedLeadAssignment = assignment;
             
-            // Update UI
-            document.querySelectorAll('#step4 .radio-option').forEach(option => {
+            // Update UI - ensure mutual exclusion by removing 'selected' from all options first
+            document.querySelectorAll('#leadAssignmentOptions .radio-option').forEach(option => {
                 option.classList.remove('selected');
+                // Also uncheck all radio buttons to ensure mutual exclusion
+                const radioInput = option.querySelector('input[type="radio"]');
+                if (radioInput) {
+                    radioInput.checked = false;
+                }
             });
             
+            // Select only the clicked option
             event.currentTarget.classList.add('selected');
+            const selectedRadio = event.currentTarget.querySelector('input[type="radio"]');
+            if (selectedRadio) {
+                selectedRadio.checked = true;
+            }
             
             // Update button state
             updateButtonState();
@@ -830,23 +935,28 @@
                     break;
                     
                 case 2:
-                    isValid = selectedProcessingMode !== null;
+                    // Field selection step - always valid since required fields are always selected
+                    isValid = selectedFields.length > 0;
                     break;
                     
                 case 3:
-                    if (selectedProcessingMode === 'MANUAL') {
-                        // Manual mode validation
-                        const startDate = document.getElementById('campaignStartDate').value;
-                        const endDate = document.getElementById('campaignEndDate').value;
-                        isValid = startDate && endDate && new Date(endDate) > new Date(startDate);
-                    } else if (selectedProcessingMode === 'AUTO') {
-                        // Automated mode validation
-                        const duration = parseInt(document.getElementById('campaignDuration').value);
-                        isValid = duration && duration >= 1 && duration <= 365;
-                    }
+                    // Processing mode step - always valid since MANUAL is pre-selected
+                    isValid = selectedProcessingMode !== null;
                     break;
                     
                 case 4:
+                    // Campaign settings step - validate dates for manual mode
+                    if (selectedProcessingMode === 'MANUAL') {
+                        const startDate = document.getElementById('campaignStartDate').value;
+                        const endDate = document.getElementById('campaignEndDate').value;
+                        isValid = startDate && endDate && new Date(endDate) > new Date(startDate);
+                    } else {
+                        isValid = true; // Auto mode doesn't need validation here
+                    }
+                    break;
+                    
+                case 5:
+                    // Lead assignment step - check if assignment is selected
                     isValid = selectedLeadAssignment !== null;
                     break;
                     
@@ -859,12 +969,12 @@
 
         function nextStep() {
             if (validateCurrentStep()) {
-                if (currentStep < 4) {
+                if (currentStep < 5) {
                     currentStep++;
                     // Handle step-specific setup
                     if (currentStep === 3) {
                         setupCampaignSettings();
-                    } else if (currentStep === 4) {
+                    } else if (currentStep === 5) {
                         populateLeadAssignmentOptions();
                     }
                     updateStepDisplay();
@@ -917,13 +1027,17 @@
                     return true;
                     
                 case 2:
+                    // Field selection step - always valid since required fields are always selected
+                    return selectedFields.length > 0;
+                    
+                case 3:
                     if (!selectedProcessingMode) {
                         alert('Please select a processing mode.');
                         return false;
                     }
                     return true;
                     
-                case 3:
+                case 4:
                     if (selectedProcessingMode === 'MANUAL') {
                         // Manual mode validation
                         const startDate = document.getElementById('campaignStartDate').value;
@@ -950,7 +1064,7 @@
                     
                     return true;
                     
-                case 4:
+                case 5:
                     if (!selectedLeadAssignment) {
                         alert('Please select a lead assignment strategy.');
                         return false;
@@ -982,7 +1096,7 @@
             });
             
             // Update progress bar
-            const progress = (currentStep / 4) * 100;
+            const progress = (currentStep / 5) * 100;
             document.getElementById('progressFill').style.width = progress + '%';
             
             // Update navigation buttons
@@ -990,7 +1104,7 @@
             const nextBtn = document.getElementById('nextBtn');
             
             prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
-            nextBtn.textContent = currentStep === 4 ? 'Complete Setup' : 'Next';
+            nextBtn.textContent = currentStep === 5 ? 'Complete Setup' : 'Next';
         }
 
         function saveConfiguration() {
@@ -1017,6 +1131,9 @@
                 configData.campaignStartDate = null;
                 configData.campaignEndDate = null;
             }
+            
+            // Add selected fields to configuration
+            configData.selectedFields = selectedFields;
             
             // Call Google Apps Script function
             google.script.run
@@ -1206,6 +1323,313 @@
         function cancelDateConfirmation() {
             google.script.host.close();
         }
+
+        // Field Selection Functions
+        function loadAvailableFields() {
+            // Load available fields from the server
+            google.script.run
+                .withSuccessHandler(onFieldsLoaded)
+                .withFailureHandler(onFieldsError)
+                .getAvailableFieldsForSelection();
+        }
+
+        function onFieldsLoaded(fields) {
+            populateFieldOptions(fields);
+        }
+
+        function onFieldsError(error) {
+            console.error('Error loading fields:', error);
+            // Fallback to hardcoded fields if server call fails
+            const fallbackFields = {
+                required: [
+                    { apiName: 'First_Name', displayName: 'First Name', required: true },
+                    { apiName: 'Last_Name', displayName: 'Last Name', required: true },
+                    { apiName: 'Phone', displayName: 'Phone', required: true },
+                    { apiName: 'Email', displayName: 'Email', required: false },
+                    { apiName: 'Datahub_Src', displayName: 'Data Source', required: true },
+                    { apiName: 'Campaign_Name', displayName: 'Campaign Name', required: true }
+                ],
+                optional: [
+                    { apiName: 'Language_Preference', displayName: 'Language Preference', required: false },
+                    { apiName: 'Description', displayName: 'Description', required: false },
+                    { apiName: 'Quote_ID', displayName: 'Quote ID', required: false },
+                    { apiName: 'Street', displayName: 'Street', required: false },
+                    { apiName: 'City', displayName: 'City', required: false },
+                    { apiName: 'State', displayName: 'Province', required: false },
+                    { apiName: 'Zip_Code', displayName: 'Postal Code', required: false },
+                    { apiName: 'Country', displayName: 'Country', required: false },
+                    { apiName: 'Rate_Plan_Description', displayName: 'Rate Plan Description', required: false },
+                    { apiName: 'Phone_Model', displayName: 'Device Model', required: false },
+                    { apiName: 'Brand', displayName: 'Current Provider', required: false },
+                    { apiName: 'note', displayName: 'Note', required: false }
+                ]
+            };
+            populateFieldOptions(fallbackFields);
+        }
+
+        function populateFieldOptions(fields) {
+            const requiredContainer = document.getElementById('requiredFields');
+            const optionalContainer = document.getElementById('optionalFields');
+
+            // Clear existing content
+            requiredContainer.innerHTML = '';
+            optionalContainer.innerHTML = '';
+
+            // Populate required fields (always selected, disabled)
+            fields.required.forEach(field => {
+                const fieldOption = createFieldOption(field, true);
+                requiredContainer.appendChild(fieldOption);
+                // Add to selected fields
+                selectedFields.push(field);
+            });
+
+            // Populate optional fields (user can select)
+            fields.optional.forEach(field => {
+                const fieldOption = createFieldOption(field, false);
+                optionalContainer.appendChild(fieldOption);
+            });
+
+            // Update button state after loading fields
+            updateButtonState();
+        }
+
+        function createFieldOption(field, isRequired) {
+            const div = document.createElement('div');
+            div.className = `field-option ${isRequired ? 'required' : ''}`;
+            
+            if (!isRequired) {
+                div.onclick = () => toggleFieldSelection(field, div);
+            }
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isRequired;
+            checkbox.disabled = isRequired;
+            checkbox.id = `field_${field.apiName}`;
+
+            const label = document.createElement('span');
+            label.className = 'field-name';
+            label.textContent = field.displayName;
+
+            div.appendChild(checkbox);
+            div.appendChild(label);
+
+            return div;
+        }
+
+        function toggleFieldSelection(field, element) {
+            const checkbox = element.querySelector('input[type="checkbox"]');
+            const isSelected = !checkbox.checked;
+            
+            checkbox.checked = isSelected;
+            
+            if (isSelected) {
+                element.classList.add('selected');
+                selectedFields.push(field);
+            } else {
+                element.classList.remove('selected');
+                selectedFields = selectedFields.filter(f => f.apiName !== field.apiName);
+            }
+
+            // Update button state
+            updateButtonState();
+        }
+
+        function getSelectedFieldsForSaving() {
+            return selectedFields;
+        }
+
+        // Update the step validation for field selection
+        function validateFieldSelection() {
+            // At least required fields should be selected (they always are)
+            // Optional: could add minimum field count validation here
+            return selectedFields.length > 0;
+        }
+
+        // Update the step navigation to handle field selection
+        function updateStepValidation() {
+            switch (currentStep) {
+                case 2:
+                    // Field selection step - always valid since required fields are always selected
+                    return validateFieldSelection();
+                default:
+                    return true;
+            }
+        }
+
+        // Configuration Loading Functions
+        function loadExistingConfiguration() {
+            // Load existing configuration to pre-populate form
+            google.script.run
+                .withSuccessHandler(onExistingConfigurationLoaded)
+                .withFailureHandler(onExistingConfigurationError)
+                .getExistingConfiguration();
+        }
+
+        function onExistingConfigurationLoaded(config) {
+            if (config && Object.keys(config).length > 0 && config.organizationType) {
+                console.log('Loading existing configuration:', config);
+                
+                // Pre-populate organization type
+                if (config.organizationType) {
+                    document.getElementById('organizationType').value = config.organizationType;
+                    handleOrganizationTypeChange(); // This will show/hide appropriate fields
+                }
+                
+                // Pre-populate processing mode
+                if (config.processingMode) {
+                    selectedProcessingMode = config.processingMode;
+                    // Update UI to reflect the selected processing mode
+                    if (config.processingMode === 'MANUAL') {
+                        const manualOption = document.querySelector('.radio-option[onclick*="MANUAL"]');
+                        if (manualOption) {
+                            manualOption.classList.add('selected');
+                            document.getElementById('modeManual').checked = true;
+                        }
+                    } else if (config.processingMode === 'AUTO') {
+                        const autoOption = document.querySelector('.radio-option[onclick*="AUTO"]');
+                        if (autoOption) {
+                            autoOption.classList.add('selected');
+                            document.getElementById('modeAuto').checked = true;
+                        }
+                    }
+                }
+                
+                // Pre-populate campaign dates
+                if (config.campaignStartDate) {
+                    document.getElementById('campaignStartDate').value = config.campaignStartDate;
+                }
+                if (config.campaignEndDate) {
+                    document.getElementById('campaignEndDate').value = config.campaignEndDate;
+                }
+                
+                // Pre-populate lead assignment
+                if (config.leadAssignment) {
+                    selectedLeadAssignment = config.leadAssignment;
+                }
+                
+                // Only load selected fields if this is an existing configuration
+                loadExistingSelectedFields();
+                
+                console.log('Configuration loaded successfully');
+            } else {
+                console.log('No existing configuration found, using defaults');
+            }
+            
+            // Update button state after loading configuration
+            updateButtonState();
+        }
+
+        function onExistingConfigurationError(error) {
+            console.error('Error loading existing configuration:', error);
+            // Continue with default values if configuration loading fails
+        }
+
+        function loadExistingSelectedFields() {
+            // Load existing selected fields
+            google.script.run
+                .withSuccessHandler(onExistingSelectedFieldsLoaded)
+                .withFailureHandler(onExistingSelectedFieldsError)
+                .getSelectedFields();
+        }
+
+        function onExistingSelectedFieldsLoaded(existingSelectedFields) {
+            if (existingSelectedFields && existingSelectedFields.length > 0) {
+                console.log('Loading existing selected fields:', existingSelectedFields);
+                
+                // Check if these are actually saved fields (not just defaults)
+                // If the fields include hidden/system fields, it means they were saved from a previous configuration
+                const hasHiddenFields = existingSelectedFields.some(field => 
+                    field.apiName === 'Datahub_Src' || 
+                    field.apiName === 'AssignmentValue' || 
+                    field.apiName === 'Zoho_Record_URL'
+                );
+                
+                if (hasHiddenFields) {
+                    // This is a real saved configuration, restore the field selections
+                    console.log('Found saved configuration, restoring field selections');
+                    
+                    // Clear current selection (except required fields which are always selected)
+                    selectedFields = selectedFields.filter(field => field.required);
+                    
+                    // Add existing selected fields to the selection (only user-selectable fields)
+                    existingSelectedFields.forEach(existingField => {
+                        // Skip hidden and system fields for UI purposes
+                        if (existingField.apiName !== 'Datahub_Src' && 
+                            existingField.apiName !== 'AssignmentValue' && 
+                            existingField.apiName !== 'Zoho_Record_URL' && 
+                            existingField.apiName !== 'Time_Created_in_Zoho' &&
+                            existingField.apiName !== 'custom_email_notify_list' &&
+                            existingField.apiName !== 'ChannelOutletId_Updated' &&
+                            existingField.apiName !== 'OutletId') {
+                            
+                            // Check if this field is not already in selectedFields
+                            const isAlreadySelected = selectedFields.some(field => field.apiName === existingField.apiName);
+                            if (!isAlreadySelected) {
+                                selectedFields.push(existingField);
+                            }
+                        }
+                    });
+                    
+                    // Update UI to reflect the selections
+                    updateFieldSelectionUI();
+                } else {
+                    console.log('No saved configuration found, using default field selection');
+                }
+            } else {
+                console.log('No existing selected fields found');
+            }
+        }
+
+        function onExistingSelectedFieldsError(error) {
+            console.error('Error loading existing selected fields:', error);
+            // Continue with default field selection if loading fails
+        }
+
+        function updateFieldSelectionUI() {
+            // Update the visual state of field options to match selectedFields
+            const allFieldOptions = document.querySelectorAll('.field-option');
+            
+            allFieldOptions.forEach(fieldOption => {
+                const checkbox = fieldOption.querySelector('input[type="checkbox"]');
+                const fieldId = checkbox.id.replace('field_', '');
+                
+                // Check if this field is in selectedFields
+                const isSelected = selectedFields.some(field => field.apiName === fieldId);
+                
+                if (!checkbox.disabled) { // Only update non-required fields
+                    checkbox.checked = isSelected;
+                    if (isSelected) {
+                        fieldOption.classList.add('selected');
+                    } else {
+                        fieldOption.classList.remove('selected');
+                    }
+                }
+            });
+        }
+
+        function updateLeadAssignmentSelectionUI() {
+            // Update lead assignment UI when step 5 is reached
+            if (selectedLeadAssignment) {
+                setTimeout(() => {
+                    const assignmentOptions = document.querySelectorAll('#leadAssignmentOptions .radio-option');
+                    assignmentOptions.forEach(option => {
+                        const input = option.querySelector('input[type="radio"]');
+                        if (input && input.value === selectedLeadAssignment) {
+                            option.classList.add('selected');
+                            input.checked = true;
+                        }
+                    });
+                }, 100); // Small delay to ensure DOM is updated
+            }
+        }
+
+        // Override the populateLeadAssignmentOptions function to include pre-selection
+        const originalPopulateLeadAssignmentOptions = populateLeadAssignmentOptions;
+        populateLeadAssignmentOptions = function() {
+            originalPopulateLeadAssignmentOptions();
+            updateLeadAssignmentSelectionUI();
+        };
     </script>
 </body>
 </html>

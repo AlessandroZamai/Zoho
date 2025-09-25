@@ -156,21 +156,6 @@
       cursor: not-allowed;
     }
     
-    .export-btn {
-      background-color: #5f6368;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      margin: 0 10px;
-      transition: background-color 0.3s ease;
-    }
-    
-    .export-btn:hover {
-      background-color: #3c4043;
-    }
     
     .spinner {
       border: 3px solid #f3f3f3;
@@ -237,7 +222,6 @@
     </div>
     
     <div class="footer">
-      <button onclick="exportResults()" class="export-btn" id="exportBtn" disabled>Export Log</button>
       <button onclick="closeDialog()" class="close-btn" id="closeBtn" disabled>Close</button>
     </div>
   </div>
@@ -397,7 +381,6 @@
     
     function enableButtons() {
       document.getElementById('closeBtn').disabled = false;
-      document.getElementById('exportBtn').disabled = false;
     }
     
     function enableCloseButton() {
@@ -436,49 +419,6 @@
       resultsList.appendChild(errorItem);
     }
     
-    function exportResults() {
-      let exportText = 'Zoho Integration Processing Results\n';
-      exportText += '=====================================\n\n';
-      exportText += `Total Rows: ${totalRows}\n`;
-      exportText += `Successful: ${successCount}\n`;
-      exportText += `Failed: ${errorCount}\n`;
-      exportText += `Warnings: ${warningCount}\n\n`;
-      exportText += 'Detailed Results:\n';
-      exportText += '-----------------\n';
-      
-      results.forEach(result => {
-        exportText += `Row ${result.rowNumber}: `;
-        if (result.success) {
-          exportText += 'SUCCESS';
-          if (result.recordId) {
-            exportText += ` (Record ID: ${result.recordId})`;
-          }
-          if (result.validationWarnings && result.validationWarnings.length > 0) {
-            exportText += ` - Warnings: ${result.validationWarnings.join(', ')}`;
-          }
-        } else {
-          exportText += 'FAILED';
-          if (result.error) {
-            exportText += ` - ${result.error}`;
-          }
-        }
-        exportText += '\n';
-      });
-      
-      // Copy to clipboard
-      navigator.clipboard.writeText(exportText).then(() => {
-        alert('Results copied to clipboard!');
-      }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = exportText;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('Results copied to clipboard!');
-      });
-    }
     
     function closeDialog() {
       google.script.host.close();

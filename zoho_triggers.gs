@@ -7,10 +7,98 @@
  * Initialize the integration when the spreadsheet opens
  * This function is automatically called when the spreadsheet is opened
  */
-function onOpen() {
+function onOpen(e) {
   // Always create the menu
   createCustomMenu();
   
+  // Check if we need to show first-time setup
+  // According to Google documentation, onOpen can access SpreadsheetApp.getUi()
+  showFirstTimeSetupIfNeeded();
+}
+
+/**
+ * Show first-time setup UI if needed
+ * Based on Google Apps Script documentation, onOpen can access UI services
+ */
+function showFirstTimeSetupIfNeeded() {
+  try {
+    const currentMode = getCurrentProcessingMode();
+    
+    if (currentMode === null) {
+      // Check if this is a configuration issue vs first-time setup
+      const configStatus = isConfigurationComplete();
+      
+      if (!configStatus.complete) {
+        // Check if it's an admin credential issue
+        const properties = PropertiesService.getScriptProperties();
+        const organizationType = properties.getProperty('ZOHO_ORGANIZATION_TYPE');
+        
+        if (organizationType === 'KI' || organizationType === 'RT') {
+          // User has started setup but admin credentials are missing
+          const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
+          const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+          
+          if (!kiTokenName || !rtTokenName) {
+            SpreadsheetApp.getUi().alert(
+              'Administrator Setup Required',
+              `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to run "adminSetupCredentials" in Apps Script, or complete the setup wizard.`,
+              SpreadsheetApp.getUi().ButtonSet.OK
+            );
+            return;
+          }
+        }
+        
+        // Show first-time setup instructions
+        showFirstTimeSetupInstructions();
+      }
+    }
+  } catch (error) {
+    Logger.log('Error in showFirstTimeSetupIfNeeded: ' + error.toString());
+    // Fallback: set flag for deferred setup
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      properties.setProperty('ZOHO_FIRST_TIME_SETUP_NEEDED', 'true');
+      Logger.log('First-time setup detected. Settings will be shown when you access the "Send to Zoho" menu.');
+    } catch (fallbackError) {
+      Logger.log('Fallback error: ' + fallbackError.toString());
+    }
+  }
+}
+
+/**
+ * Show first-time setup instructions UI
+ */
+function showFirstTimeSetupInstructions() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    const response = ui.alert(
+      'Welcome to Zoho Integration!',
+      'This appears to be your first time using the Zoho Integration.\n\n' +
+      'To get started:\n' +
+      '1. Use the "Send to Zoho" menu above\n' +
+      '2. Click "Settings" to open the setup wizard\n' +
+      '3. Follow the configuration steps\n\n' +
+      'Please use the "Send to Zoho" > "Settings" menu option to access the setup wizard.',
+      ui.ButtonSet.OK
+    );
+    
+    // Set a flag to indicate the user should be directed to settings
+    const properties = PropertiesService.getScriptProperties();
+    properties.setProperty('ZOHO_SHOW_SETTINGS_PROMPT', 'true');
+    
+  } catch (error) {
+    Logger.log('Error showing first-time setup instructions: ' + error.toString());
+    // Fallback to just logging
+    Logger.log('First-time setup detected. Please use the "Send to Zoho" menu to access Settings.');
+  }
+}
+
+/**
+ * Enhanced onOpen function that can show UI dialogs
+ * This runs as an installable trigger, not a simple trigger
+ */
+function onOpenEnhanced() {
   const currentMode = getCurrentProcessingMode();
   
   if (currentMode === null) {
@@ -37,11 +125,35 @@ function onOpen() {
         }
       }
       
-      // Show setup wizard automatically for first-time users
-      setTimeout(() => {
-        showSetupWizard();
-      }, 1000);
+      // Show first-time setup instructions
+      showFirstTimeSetupInstructions();
     }
+  }
+}
+
+/**
+ * Create installable trigger for enhanced onOpen functionality
+ */
+function createOnOpenInstallableTrigger() {
+  try {
+    // Check if trigger already exists
+    const existingTriggers = ScriptApp.getProjectTriggers();
+    const onOpenTriggerExists = existingTriggers.some(trigger => 
+      trigger.getHandlerFunction() === 'onOpenEnhanced' && 
+      trigger.getEventType() === ScriptApp.EventType.ON_OPEN
+    );
+    
+    if (!onOpenTriggerExists) {
+      ScriptApp.newTrigger('onOpenEnhanced')
+        .forSpreadsheet(SpreadsheetApp.getActive())
+        .onOpen()
+        .create();
+      Logger.log('Created installable onOpen trigger for enhanced functionality');
+    }
+    
+  } catch (error) {
+    Logger.log('Error creating installable onOpen trigger: ' + error.toString());
+    // This is not critical, the simple trigger will still work for basic functionality
   }
 }
 
@@ -53,15 +165,19 @@ function createCustomMenu() {
   ui.createMenu('Send to Zoho')
     .addItem('Send unsubmitted rows to Zoho', 'sendUnsubmittedRowsToZoho')
     .addSeparator()
-    .addItem('Change settings', 'showSetupWizard')
+    .addItem('Settings', 'showSetupWizard')
+    .addItem('Reset sheet', 'resetSheetData')
     .addToUi();
 }
 
 /**
  * Create automated trigger for onEdit events
  * Used when switching to automated processing mode
+ * DISABLED: Automated processing is currently disabled
  */
 function createAutomatedTrigger() {
+  // COMMENTED OUT: Automated processing disabled per requirements
+  /*
   try {
     ScriptApp.newTrigger('sendToWebhook')
       .forSpreadsheet(SpreadsheetApp.getActive())
@@ -72,6 +188,10 @@ function createAutomatedTrigger() {
     Logger.log('Error creating automated trigger: ' + error.toString());
     throw error;
   }
+  */
+  
+  Logger.log('Automated trigger creation is currently disabled. Only manual processing is available.');
+  throw new Error('Automated processing is currently disabled. Please use manual processing mode.');
 }
 
 /**
@@ -206,7 +326,7 @@ function resetTriggerConfiguration() {
     Logger.log('Trigger configuration reset successfully');
     return { 
       success: true, 
-      message: 'Trigger configuration has been reset. Please run the setup wizard to reconfigure.' 
+      message: 'Trigger configuration has been reset. Please run Settings to reconfigure.' 
     };
     
   } catch (error) {
@@ -228,7 +348,7 @@ function testTriggerFunctionality() {
   if (!currentMode) {
     return {
       success: false,
-      message: 'No processing mode configured. Please run the setup wizard first.'
+      message: 'No processing mode configured. Please run Settings first.'
     };
   }
   

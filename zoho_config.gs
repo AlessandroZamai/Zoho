@@ -12,7 +12,9 @@ const CONFIG_AUTH_TOKEN_VALUE = 'ZOHO_AUTH_TOKEN_VALUE';
 const CONFIG_CAMPAIGN_START_DATE = 'ZOHO_CAMPAIGN_START_DATE';
 const CONFIG_CAMPAIGN_END_DATE = 'ZOHO_CAMPAIGN_END_DATE';
 const CONFIG_LEAD_ASSIGNMENT = 'ZOHO_LEAD_ASSIGNMENT';
-const CONFIG_ENABLED_COLUMNS = 'ZOHO_ENABLED_COLUMNS';
+const CONFIG_SELECTED_FIELDS = 'ZOHO_SELECTED_FIELDS';
+const CONFIG_SETUP_COMPLETION_DATE = 'ZOHO_SETUP_COMPLETION_DATE';
+const CONFIG_ENABLED_COLUMNS = 'ZOHO_ENABLED_COLUMNS'; // Legacy - will be removed
 
 // Predefined organization settings
 const ORG_SETTINGS = {
@@ -43,6 +45,34 @@ function showSetupWizard() {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     if (!spreadsheet) {
       throw new Error('No active spreadsheet found');
+    }
+    
+    // Check if this is a first-time setup
+    const properties = PropertiesService.getScriptProperties();
+    const isFirstTimeSetup = properties.getProperty('ZOHO_FIRST_TIME_SETUP_NEEDED');
+    const showSettingsPrompt = properties.getProperty('ZOHO_SHOW_SETTINGS_PROMPT');
+    
+    if (isFirstTimeSetup === 'true' || showSettingsPrompt === 'true') {
+      // Show welcome message for first-time users
+      const ui = SpreadsheetApp.getUi();
+      const response = ui.alert(
+        'Welcome to Zoho Integration!',
+        'This appears to be your first time using the Zoho Integration.\n\n' +
+        'The Settings will help you configure:\n' +
+        '• Organization type (Corporate Store, Mobile Klinik, or Dealership)\n' +
+        '• Processing mode (Automated or Manual)\n' +
+        '• Campaign settings and lead assignment\n\n' +
+        'Would you like to continue with the setup?',
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (response !== ui.Button.YES) {
+        return { success: false, message: 'Setup cancelled by user' };
+      }
+      
+      // Clear the first-time setup flags
+      properties.deleteProperty('ZOHO_FIRST_TIME_SETUP_NEEDED');
+      properties.deleteProperty('ZOHO_SHOW_SETTINGS_PROMPT');
     }
     
     const html = HtmlService.createHtmlOutputFromFile('zoho_unified_ui')
@@ -329,8 +359,8 @@ function saveCompleteConfiguration(config) {
   try {
     const properties = PropertiesService.getScriptProperties();
     
-    // Save processing mode
-    properties.setProperty(CONFIG_PROCESSING_MODE, config.processingMode);
+    // Save processing mode (force to MANUAL for now)
+    properties.setProperty(CONFIG_PROCESSING_MODE, 'MANUAL');
     
     // Save organization type
     properties.setProperty(CONFIG_ORGANIZATION_TYPE, config.organizationType);
@@ -365,23 +395,55 @@ function saveCompleteConfiguration(config) {
     // Save lead assignment strategy
     properties.setProperty(CONFIG_LEAD_ASSIGNMENT, config.leadAssignment);
     
-    // Note: No longer using enabledColumns - single dynamic column approach
+    // Save selected fields with assignment field based on lead assignment strategy
+    if (config.selectedFields) {
+      let fieldsToSave = [...config.selectedFields];
+      
+      // Add store field if store assignment is selected
+      if (config.leadAssignment === 'Store') {
+        // Check if store field is not already included
+        const hasStoreField = fieldsToSave.some(field => field.apiName === 'ChannelOutletId');
+        if (!hasStoreField) {
+          fieldsToSave.push(STORE_ASSIGNMENT_FIELD);
+        }
+      }
+      
+      // Ensure AssignmentValue field is always included for all assignment types
+      const hasAssignmentField = fieldsToSave.some(field => field.apiName === 'AssignmentValue');
+      if (!hasAssignmentField) {
+        // Add the assignment field with appropriate display name based on assignment strategy
+        const assignmentDisplayName = getAssignmentColumnTitle(config.leadAssignment);
+        fieldsToSave.push({
+          apiName: 'AssignmentValue',
+          displayName: assignmentDisplayName,
+          required: config.leadAssignment !== 'ADMIN', // Not required for ADMIN assignment
+          validation: null
+        });
+      }
+      
+      properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(fieldsToSave));
+    }
+    
+    // Save setup completion date
+    const today = new Date().toISOString().split('T')[0];
+    properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, today);
+    
     // Remove old enabledColumns property if it exists
     properties.deleteProperty(CONFIG_ENABLED_COLUMNS);
     
-    // Configure triggers and menu based on processing mode
-    const triggerResult = configureTriggers(config.processingMode);
+    // Configure triggers and menu based on processing mode (always manual now)
+    const triggerResult = configureTriggers('MANUAL');
     if (!triggerResult.success) {
       throw new Error(triggerResult.message);
     }
     
-    // Update the CSV template with new columns
-    updateSpreadsheetTemplate();
+    // Update the spreadsheet with selected fields
+    updateSpreadsheetWithSelectedFields();
     
     Logger.log('Configuration saved successfully');
     return { 
       success: true, 
-      message: `Configuration saved successfully! Your ${config.organizationType === 'DL' ? 'dealership' : (config.organizationType === 'KI' ? 'corporate store' : 'Mobile Klinik')} integration is now configured for ${config.processingMode === 'AUTO' ? 'automated' : 'manual'} processing.`
+      message: `Configuration saved successfully! Your ${config.organizationType === 'DL' ? 'dealership' : (config.organizationType === 'KI' ? 'corporate store' : 'Mobile Klinik')} integration is now configured for manual processing.`
     };
     
   } catch (error) {
@@ -515,7 +577,7 @@ function getExpectedHeaders() {
 }
 
 /**
- * Update spreadsheet template with new columns and formatting
+ * Update spreadsheet template with new columns and formatting (legacy function)
  */
 function updateSpreadsheetTemplate() {
   try {
@@ -579,5 +641,280 @@ function updateSpreadsheetTemplate() {
     
   } catch (error) {
     Logger.log('Error updating spreadsheet template: ' + error.toString());
+  }
+}
+
+/**
+ * Update spreadsheet with user-selected fields
+ */
+function updateSpreadsheetWithSelectedFields() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const selectedFields = getSelectedFields();
+    
+    // Check if there's existing data and warn user
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      const ui = SpreadsheetApp.getUi();
+      const response = ui.alert(
+        'Clear Existing Data?',
+        'Changing field selections will clear all existing data in the sheet.\n\nDo you want to continue?',
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (response !== ui.Button.YES) {
+        throw new Error('Field update cancelled by user');
+      }
+      
+      // Clear all data except header row
+      if (lastRow > 1) {
+        sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clear();
+      }
+    }
+    
+    // Create headers from selected fields
+    const headers = selectedFields.map(field => field.displayName);
+    
+    // Clear existing content, data validation, conditional formatting, and notes
+    sheet.clear();
+    // Clear data validation from the entire sheet (not just data range)
+    const maxRows = sheet.getMaxRows();
+    const maxCols = sheet.getMaxColumns();
+    if (maxRows > 0 && maxCols > 0) {
+      const entireSheet = sheet.getRange(1, 1, maxRows, maxCols);
+      entireSheet.clearDataValidations();
+      // Clear all notes from the entire sheet
+      entireSheet.clearNote();
+    }
+    sheet.clearConditionalFormatRules();
+    
+    // Set new headers
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    
+    // Format header row
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#e8f0fe');
+    headerRange.setBorder(true, true, true, true, true, true);
+    
+    // Highlight required columns
+    highlightRequiredColumns(selectedFields);
+    
+    // Apply data validation to fields that need it
+    applyDataValidationToSheet();
+    
+    Logger.log('Spreadsheet updated with selected fields: ' + headers.join(', '));
+    
+  } catch (error) {
+    Logger.log('Error updating spreadsheet with selected fields: ' + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Highlight required columns in the spreadsheet
+ */
+function highlightRequiredColumns(selectedFields) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const lastRow = Math.max(sheet.getLastRow(), 100); // Apply to at least 100 rows
+    
+    selectedFields.forEach((field, index) => {
+      if (field.required) {
+        const columnIndex = index + 1; // Convert to 1-based index
+        
+        // Highlight header cell for required fields
+        const headerCell = sheet.getRange(1, columnIndex);
+        headerCell.setBackground('#fff3e0'); // Light orange background
+        headerCell.setFontColor('#e65100'); // Dark orange text
+        headerCell.setFontWeight('bold');
+        
+        // Add a note to indicate it's required
+        headerCell.setNote('⚠️ REQUIRED FIELD - This field must be filled for each row');
+        
+        // Apply conditional formatting to data cells to highlight empty required fields
+        if (lastRow > 1) {
+          const dataRange = sheet.getRange(2, columnIndex, lastRow - 1, 1);
+          
+          // Create conditional formatting rule for empty cells in required columns
+          const rule = SpreadsheetApp.newConditionalFormatRule()
+            .whenCellEmpty()
+            .setBackground('#ffebee') // Light red background for empty required cells
+            .setRanges([dataRange])
+            .build();
+          
+          const rules = sheet.getConditionalFormatRules();
+          rules.push(rule);
+          sheet.setConditionalFormatRules(rules);
+        }
+        
+        Logger.log(`Highlighted required column: ${field.displayName} (column ${columnIndex})`);
+      } else if (field.apiName === 'ChannelOutletId') {
+        // Special handling for store assignment field
+        const columnIndex = index + 1; // Convert to 1-based index
+        const headerCell = sheet.getRange(1, columnIndex);
+        
+        // Add clarifying note for store field
+        headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 11-digit ChannelOutletID (store long-code)');
+        
+        Logger.log(`Added note to store assignment column: ${field.displayName} (column ${columnIndex})`);
+      }
+    });
+    
+  } catch (error) {
+    Logger.log('Error highlighting required columns: ' + error.toString());
+  }
+}
+
+/**
+ * Apply data validation dropdowns to appropriate fields
+ */
+function applyDataValidationToSheet() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const selectedFields = getSelectedFields();
+    
+    selectedFields.forEach((field, index) => {
+      if (field.validation && field.validation.length > 0) {
+        const columnIndex = index + 1; // Convert to 1-based index
+        const lastRow = Math.max(sheet.getLastRow(), 100); // Apply to at least 100 rows
+        
+        if (lastRow > 1) {
+          const range = sheet.getRange(2, columnIndex, lastRow - 1, 1);
+          const rule = SpreadsheetApp.newDataValidation()
+            .requireValueInList(field.validation)
+            .setAllowInvalid(false)
+            .setHelpText(`Please select one of: ${field.validation.join(', ')}`)
+            .build();
+          
+          range.setDataValidation(rule);
+          Logger.log(`Applied data validation to ${field.displayName}: ${field.validation.join(', ')}`);
+        }
+      }
+    });
+    
+  } catch (error) {
+    Logger.log('Error applying data validation: ' + error.toString());
+  }
+}
+
+/**
+ * Check if setup completion date differs from today (for manual processing date tracking)
+ */
+function checkSetupDateForManualProcessing() {
+  const properties = PropertiesService.getScriptProperties();
+  const setupDate = properties.getProperty(CONFIG_SETUP_COMPLETION_DATE);
+  const today = new Date().toISOString().split('T')[0];
+  
+  if (!setupDate) {
+    // No setup date recorded, assume first time
+    return { needsConfirmation: true, setupDate: null, today: today };
+  }
+  
+  if (setupDate !== today) {
+    // Different day, needs confirmation
+    return { needsConfirmation: true, setupDate: setupDate, today: today };
+  }
+  
+  // Same day, no confirmation needed
+  return { needsConfirmation: false, setupDate: setupDate, today: today };
+}
+
+/**
+ * Reset sheet data (clear all rows except header)
+ */
+function resetSheetData() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      'Reset Sheet Data',
+      'This will clear all data rows while preserving the header row and your configuration.\n\nAre you sure you want to continue?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response !== ui.Button.YES) {
+      return { success: false, message: 'Reset cancelled by user' };
+    }
+    
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow > 1) {
+      // Get the data range (excluding header row)
+      const dataRange = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+      
+      // Store background colors before clearing
+      const backgroundColors = dataRange.getBackgrounds();
+      
+      // Clear only the content, not formatting
+      dataRange.clearContent();
+      
+      // Restore background colors
+      dataRange.setBackgrounds(backgroundColors);
+      
+      // Reapply data validation to cleared cells
+      applyDataValidationToSheet();
+      
+      Logger.log('Sheet data reset successfully - cleared ' + (lastRow - 1) + ' data rows while preserving background colors');
+      
+      ui.alert(
+        'Reset Complete',
+        `Successfully cleared ${lastRow - 1} data rows. Header row, background colors, and configuration preserved.`,
+        ui.ButtonSet.OK
+      );
+      
+      return { success: true, message: `Cleared ${lastRow - 1} data rows while preserving formatting` };
+    } else {
+      ui.alert(
+        'No Data to Clear',
+        'The sheet only contains the header row. No data to clear.',
+        ui.ButtonSet.OK
+      );
+      
+      return { success: true, message: 'No data rows to clear' };
+    }
+    
+  } catch (error) {
+    Logger.log('Error resetting sheet data: ' + error.toString());
+    
+    SpreadsheetApp.getUi().alert(
+      'Reset Error',
+      'Failed to reset sheet data: ' + error.toString(),
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return { success: false, message: error.toString() };
+  }
+}
+
+/**
+ * Get available fields for field selection UI
+ */
+function getAvailableFieldsForSelection() {
+  return {
+    required: AVAILABLE_FIELDS.required,
+    optional: AVAILABLE_FIELDS.optional
+  };
+}
+
+/**
+ * Save selected fields from the setup wizard
+ */
+function saveSelectedFields(selectedFields) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    
+    // Add hidden fields and system fields to the selection
+    const allSelectedFields = [...selectedFields, ...HIDDEN_FIELDS, ...SYSTEM_FIELDS];
+    
+    properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(allSelectedFields));
+    
+    Logger.log('Selected fields saved: ' + allSelectedFields.map(f => f.displayName).join(', '));
+    
+    return { success: true, message: 'Selected fields saved successfully' };
+    
+  } catch (error) {
+    Logger.log('Error saving selected fields: ' + error.toString());
+    return { success: false, message: error.toString() };
   }
 }

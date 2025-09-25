@@ -203,7 +203,7 @@ function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
 }
 
 /**
- * Build Zoho API payload from row data
+ * Build Zoho API payload from row data using dynamic field mapping
  */
 function buildZohoPayload(rowData) {
   try {
@@ -226,29 +226,11 @@ function buildZohoPayload(rowData) {
       endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
     }
     
-    // Clean phone using column constants
-    const phone = String(getColumnValue(rowData, 'PHONE')).replace(/[^0-9+]/g, '');
-    
-    // Build base payload using column constants
+    // Build base payload with required system fields
     const payload = {
       auth_token_name: config.authTokenName,
       auth_token_value: config.authTokenValue,
-      First_Name: getColumnValue(rowData, 'FIRST_NAME'),
-      Last_Name: getColumnValue(rowData, 'LAST_NAME'),
-      Phone: phone,
-      Email: getColumnValue(rowData, 'EMAIL'),
-      Language_Preference: getColumnValue(rowData, 'PREFERRED_LANGUAGE'),
       Datahub_Src: "Google Apps Script",
-      Campaign_Name: getColumnValue(rowData, 'CAMPAIGN_NAME'),
-      Description: getColumnValue(rowData, 'DESCRIPTION'),
-      Street: getColumnValue(rowData, 'STREET'),
-      City: getColumnValue(rowData, 'CITY'),
-      State: getColumnValue(rowData, 'PROVINCE'),
-      Zip_Code: getColumnValue(rowData, 'POSTAL_CODE'), // "Postal Code" maps to API field "Zip_Code"
-      Country: getColumnValue(rowData, 'COUNTRY'),
-      Rate_Plan_Description: getColumnValue(rowData, 'RATE_PLAN'),
-      Phone_Model: getColumnValue(rowData, 'DEVICE_MODEL'),
-      Brand: getColumnValue(rowData, 'CURRENT_PROVIDER'),
       notify_record_owner: true,
       OrgTypeCode: config.orgTypeCode,
       Organization_Code: config.orgCode,
@@ -258,21 +240,49 @@ function buildZohoPayload(rowData) {
       Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
     };
     
-    // Add assignment field based on configuration
-    const assignmentValue = getColumnValue(rowData, 'ASSIGNMENT_VALUE');
-    if (assignmentValue && assignmentValue.toString().trim() !== '') {
-      switch (config.leadAssignment) {
-        case 'Store':
-          payload.ChannelOutletId = assignmentValue.toString().trim();
-          break;
-        case 'Sales_Rep':
-          payload.AssignToSalesRepEmail = assignmentValue.toString().trim();
-          break;
-        // ADMIN assignment doesn't need a value in the payload
+    // Get selected fields and build payload dynamically
+    const selectedFields = getSelectedFields();
+    
+    selectedFields.forEach((field, index) => {
+      if (field.apiName !== 'Zoho_Record_URL' && field.apiName !== 'Time_Created_in_Zoho' && field.apiName !== 'AssignmentValue') {
+        const value = rowData[index];
+        
+        if (value !== null && value !== undefined && value !== '') {
+          // Special handling for phone field
+          if (field.apiName === 'Phone') {
+            payload[field.apiName] = String(value).replace(/[^0-9+]/g, '');
+          } else {
+            payload[field.apiName] = value;
+          }
+        }
+      }
+    });
+    
+    // Handle assignment field based on configuration
+    const assignmentField = selectedFields.find(f => f.apiName === 'AssignmentValue');
+    if (assignmentField) {
+      const assignmentIndex = selectedFields.indexOf(assignmentField);
+      const assignmentValue = rowData[assignmentIndex];
+      
+      if (assignmentValue && assignmentValue.toString().trim() !== '') {
+        switch (config.leadAssignment) {
+          case 'Store':
+            payload.ChannelOutletId_Updated = assignmentValue.toString().trim();
+            break;
+          case 'Sales_Rep':
+            payload.AssignToSalesRepEmail = assignmentValue.toString().trim();
+            break;
+          // ADMIN assignment doesn't need a value in the payload
+        }
       }
     }
     
-    Logger.log('Payload built successfully');
+    Logger.log('Payload built successfully using dynamic field mapping');
+    Logger.log('=== PAYLOAD DETAILS ===');
+    Logger.log('Full payload: ' + JSON.stringify(payload, null, 2));
+    Logger.log('Payload size: ' + JSON.stringify(payload).length + ' characters');
+    Logger.log('Selected fields: ' + selectedFields.map(f => f.displayName).join(', '));
+    Logger.log('======================');
     return payload;
     
   } catch (error) {
@@ -292,6 +302,13 @@ function sendToZohoAPI(payload) {
       'payload': JSON.stringify(payload),
       'muteHttpExceptions': true
     };
+    
+    Logger.log('=== API REQUEST DETAILS ===');
+    Logger.log('Webhook URL: ' + WEBHOOK_URL);
+    Logger.log('Request method: ' + options.method);
+    Logger.log('Content type: ' + options.contentType);
+    Logger.log('Request payload: ' + options.payload);
+    Logger.log('===========================');
     
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
     const responseCode = response.getResponseCode();
@@ -349,14 +366,22 @@ function updateSpreadsheetWithResult(rowNumber, recordId) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     
-    // Update record ID column using column constants
-    const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index for getRange
-    sheet.getRange(rowNumber, recordUrlColumn).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+    // Update record ID column using dynamic field mapping
+    try {
+      const recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index for getRange
+      sheet.getRange(rowNumber, recordUrlColumn).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+    } catch (error) {
+      Logger.log('Warning: Could not update Zoho Record URL column - ' + error.toString());
+    }
     
-    // Update timestamp column using column constants
-    const timestampColumn = getColumnIndex('TIME_CREATED') + 1; // Convert to 1-based index for getRange
-    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-    sheet.getRange(rowNumber, timestampColumn).setValue(timestamp);
+    // Update timestamp column using dynamic field mapping
+    try {
+      const timestampColumn = getColumnIndexByApiName('Time_Created_in_Zoho') + 1; // Convert to 1-based index for getRange
+      const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+      sheet.getRange(rowNumber, timestampColumn).setValue(timestamp);
+    } catch (error) {
+      Logger.log('Warning: Could not update timestamp column - ' + error.toString());
+    }
     
     Logger.log('Spreadsheet updated for row ' + rowNumber);
     return { success: true };
@@ -390,23 +415,31 @@ function validateEditEvent(e) {
   
   Logger.log('Change detected in row: ' + rowToProcess);
   
-  // Check if row has already been processed using column constants
+  // Check if row has already been processed using dynamic field mapping
   const sheet = SpreadsheetApp.getActiveSheet();
-  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
-  const recordIdCell = sheet.getRange(rowToProcess, recordUrlColumn).getValue();
-  if (recordIdCell && recordIdCell.toString().trim() !== '') {
-    Logger.log('Row ' + rowToProcess + ' has already been processed. Ignoring.');
-    return null;
+  try {
+    const recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
+    const recordIdCell = sheet.getRange(rowToProcess, recordUrlColumn).getValue();
+    if (recordIdCell && recordIdCell.toString().trim() !== '') {
+      Logger.log('Row ' + rowToProcess + ' has already been processed. Ignoring.');
+      return null;
+    }
+  } catch (error) {
+    Logger.log('Warning: Could not check Zoho Record URL column - ' + error.toString());
   }
   
   // Check if assignment column has data when ADMIN assignment is configured
   const config = getConfigurationValues();
   if (config.leadAssignment === 'ADMIN') {
-    const assignmentColumn = getColumnIndex('ASSIGNMENT_VALUE') + 1; // Convert to 1-based index
-    const assignmentValue = sheet.getRange(rowToProcess, assignmentColumn).getValue();
-    if (assignmentValue && assignmentValue.toString().trim() !== '') {
-      Logger.log('Row ' + rowToProcess + ' has data in assignment column but ADMIN assignment is configured. Ignoring.');
-      return null;
+    try {
+      const assignmentColumn = getColumnIndexByApiName('AssignmentValue') + 1; // Convert to 1-based index
+      const assignmentValue = sheet.getRange(rowToProcess, assignmentColumn).getValue();
+      if (assignmentValue && assignmentValue.toString().trim() !== '') {
+        Logger.log('Row ' + rowToProcess + ' has data in assignment column but ADMIN assignment is configured. Ignoring.');
+        return null;
+      }
+    } catch (error) {
+      Logger.log('Warning: Could not check assignment column - ' + error.toString());
     }
   }
   
@@ -425,14 +458,38 @@ function getUnsubmittedRows() {
   }
   
   const unsubmittedRows = [];
-  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
+  
+  // Try to get the record URL column using dynamic mapping, fallback to legacy if needed
+  let recordUrlColumn;
+  try {
+    recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
+  } catch (error) {
+    Logger.log('Warning: Could not find Zoho_Record_URL column using dynamic mapping, trying legacy approach');
+    try {
+      recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
+    } catch (legacyError) {
+      Logger.log('Warning: Could not find record URL column at all - ' + legacyError.toString());
+      recordUrlColumn = null;
+    }
+  }
   
   // Start from row 2 (skip header)
   for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
-    // Check if Record ID column is empty using column constants
-    const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
+    let isUnsubmitted = true;
     
-    if (!recordIdCell || recordIdCell.toString().trim() === '') {
+    // Check if Record ID column is empty (if we found the column)
+    if (recordUrlColumn) {
+      try {
+        const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
+        if (recordIdCell && recordIdCell.toString().trim() !== '') {
+          isUnsubmitted = false;
+        }
+      } catch (error) {
+        Logger.log('Warning: Could not check record URL for row ' + rowNum + ' - ' + error.toString());
+      }
+    }
+    
+    if (isUnsubmitted) {
       // Get all data for this row
       const rowData = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
       
@@ -462,9 +519,6 @@ function processAllRows() {
     const row = rowsToProcess[i];
     const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL');
     results.push(result);
-    
-    // Add a small delay to prevent overwhelming the API
-    Utilities.sleep(500);
   }
   
   // Clean up stored data
@@ -512,7 +566,20 @@ function getProcessedRowsCount() {
   
   let processedCount = 0;
   let totalDataRows = 0;
-  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
+  
+  // Try to get the record URL column using dynamic mapping, fallback to legacy if needed
+  let recordUrlColumn;
+  try {
+    recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
+  } catch (error) {
+    Logger.log('Warning: Could not find Zoho_Record_URL column using dynamic mapping, trying legacy approach');
+    try {
+      recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
+    } catch (legacyError) {
+      Logger.log('Warning: Could not find record URL column at all - ' + legacyError.toString());
+      recordUrlColumn = null;
+    }
+  }
   
   // Start from row 2 (skip header)
   for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
@@ -525,10 +592,16 @@ function getProcessedRowsCount() {
     if (hasData) {
       totalDataRows++;
       
-      // Check if Record ID column has data using column constants
-      const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
-      if (recordIdCell && recordIdCell.toString().trim() !== '') {
-        processedCount++;
+      // Check if Record ID column has data (if we found the column)
+      if (recordUrlColumn) {
+        try {
+          const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
+          if (recordIdCell && recordIdCell.toString().trim() !== '') {
+            processedCount++;
+          }
+        } catch (error) {
+          Logger.log('Warning: Could not check record URL for row ' + rowNum + ' - ' + error.toString());
+        }
       }
     }
   }

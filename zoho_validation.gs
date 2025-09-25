@@ -4,88 +4,118 @@
  */
 
 /**
- * Unified validation function for row data
+ * Unified validation function for row data using dynamic field mapping
  * Used by both automated and manual processing modes
  */
 function validateRowDataUnified(rowData, rowNumber) {
   const errors = [];
   const warnings = [];
   
-  // Required fields validation using column constants
-  if (!getColumnValue(rowData, 'FIRST_NAME') || getColumnValue(rowData, 'FIRST_NAME').toString().trim() === '') {
-    errors.push('First Name is required');
-  }
+  // Get selected fields for validation
+  const selectedFields = getSelectedFields();
   
-  if (!getColumnValue(rowData, 'LAST_NAME') || getColumnValue(rowData, 'LAST_NAME').toString().trim() === '') {
-    errors.push('Last Name is required');
-  }
-  
-  if (!getColumnValue(rowData, 'PHONE') || getColumnValue(rowData, 'PHONE').toString().trim() === '') {
-    errors.push('Phone is required');
-  } else {
-    // Validate phone format
-    const phone = String(getColumnValue(rowData, 'PHONE')).replace(/[^0-9+]/g, '');
-    if (phone.length < 10) {
-      errors.push('Phone must contain at least 10 digits');
+  // Validate each field based on its configuration
+  selectedFields.forEach((field, index) => {
+    const value = rowData[index];
+    const fieldValue = value ? value.toString().trim() : '';
+    
+    // Check required fields
+    if (field.required && (!value || fieldValue === '')) {
+      errors.push(`${field.displayName} is required`);
+      return;
     }
-  }
-  
-  if (!getColumnValue(rowData, 'EMAIL') || getColumnValue(rowData, 'EMAIL').toString().trim() === '') {
-    errors.push('Email is required');
-  } else {
-    // Basic email validation
-    const email = getColumnValue(rowData, 'EMAIL').toString().trim();
-    if (!email.includes('@') || !email.includes('.')) {
-      errors.push('Email format appears invalid');
+    
+    // Skip validation for empty optional fields
+    if (!fieldValue) {
+      return;
     }
-  }
-  
-  if (!getColumnValue(rowData, 'CAMPAIGN_NAME') || getColumnValue(rowData, 'CAMPAIGN_NAME').toString().trim() === '') {
-    errors.push('Campaign Name is required');
-  }
-  
-  // Validate Preferred Language field
-  const preferredLanguage = getColumnValue(rowData, 'PREFERRED_LANGUAGE');
-  if (preferredLanguage && preferredLanguage.toString().trim() !== '') {
-    const languagePreference = preferredLanguage.toString().trim().toLowerCase();
-    if (languagePreference !== 'en-ca' && languagePreference !== 'fr-ca') {
-      errors.push('Preferred Language must be either "en-ca" or "fr-ca"');
+    
+    // Field-specific validation
+    switch (field.apiName) {
+      case 'Phone':
+        const cleanPhone = String(value).replace(/[^0-9+]/g, '');
+        if (cleanPhone.length < 10) {
+          errors.push('Phone must contain at least 10 digits');
+        }
+        break;
+        
+      case 'Email':
+        if (!fieldValue.includes('@') || !fieldValue.includes('.')) {
+          errors.push('Email format appears invalid');
+        }
+        break;
+        
+      case 'Language_Preference':
+        const languagePreference = fieldValue.toLowerCase();
+        if (languagePreference !== 'en-ca' && languagePreference !== 'fr-ca') {
+          errors.push('Language Preference must be either "en-ca" or "fr-ca"');
+        }
+        break;
+        
+      case 'State': // Province field
+        if (field.validation && field.validation.length > 0) {
+          if (!field.validation.includes(fieldValue.toUpperCase())) {
+            errors.push(`Province must be one of: ${field.validation.join(', ')}`);
+          }
+        }
+        break;
     }
-  }
+    
+    // Validation for fields with predefined options
+    if (field.validation && field.validation.length > 0 && field.apiName !== 'State') {
+      if (!field.validation.includes(fieldValue)) {
+        errors.push(`${field.displayName} must be one of: ${field.validation.join(', ')}`);
+      }
+    }
+  });
   
-  // Optional field warnings
-  if (!getColumnValue(rowData, 'STREET') || getColumnValue(rowData, 'STREET').toString().trim() === '') {
-    warnings.push('Street address is missing');
-  }
-  
-  if (!getColumnValue(rowData, 'CITY') || getColumnValue(rowData, 'CITY').toString().trim() === '') {
-    warnings.push('City is missing');
-  }
-  
-  // Validate assignment fields based on configuration
+  // Validate assignment field based on configuration
   const config = getConfigurationValues();
-  const assignmentValue = getColumnValue(rowData, 'ASSIGNMENT_VALUE');
+  const assignmentField = selectedFields.find(f => f.apiName === 'AssignmentValue');
   
-  if (config.leadAssignment === 'Store') {
-    if (!assignmentValue || assignmentValue.toString().trim() === '') {
-      errors.push('Channel Outlet ID is required for Store assignment');
-    } else {
-      const channelOutletId = assignmentValue.toString().trim();
-      if (channelOutletId.length !== 11 || !/^\d+$/.test(channelOutletId)) {
-        errors.push('Channel Outlet ID must be exactly 11 digits');
+  if (assignmentField) {
+    const assignmentIndex = selectedFields.indexOf(assignmentField);
+    const assignmentValue = rowData[assignmentIndex];
+    const assignmentValueStr = assignmentValue ? assignmentValue.toString().trim() : '';
+    
+    if (config.leadAssignment === 'Store') {
+      if (!assignmentValueStr) {
+        errors.push('Channel Outlet ID is required for Store assignment');
+      } else {
+        if (assignmentValueStr.length !== 11 || !/^\d+$/.test(assignmentValueStr)) {
+          errors.push('Channel Outlet ID must be exactly 11 digits');
+        }
+      }
+    } else if (config.leadAssignment === 'Sales_Rep') {
+      if (!assignmentValueStr) {
+        errors.push('Sales Rep Email is required for Sales Rep assignment');
+      } else {
+        if (!assignmentValueStr.includes('@') || !assignmentValueStr.includes('.')) {
+          errors.push('Sales Rep Email format appears invalid');
+        }
       }
     }
-  } else if (config.leadAssignment === 'Sales_Rep') {
-    if (!assignmentValue || assignmentValue.toString().trim() === '') {
-      errors.push('Sales Rep Email is required for Sales Rep assignment');
-    } else {
-      const email = assignmentValue.toString().trim();
-      if (!email.includes('@') || !email.includes('.')) {
-        errors.push('Sales Rep Email format appears invalid');
-      }
+    // ADMIN assignment doesn't require any assignment value
+  }
+  
+  // Add warnings for commonly missing optional fields
+  const streetField = selectedFields.find(f => f.apiName === 'Street');
+  if (streetField) {
+    const streetIndex = selectedFields.indexOf(streetField);
+    const streetValue = rowData[streetIndex];
+    if (!streetValue || streetValue.toString().trim() === '') {
+      warnings.push('Street address is missing');
     }
   }
-  // ADMIN assignment doesn't require any assignment value
+  
+  const cityField = selectedFields.find(f => f.apiName === 'City');
+  if (cityField) {
+    const cityIndex = selectedFields.indexOf(cityField);
+    const cityValue = rowData[cityIndex];
+    if (!cityValue || cityValue.toString().trim() === '') {
+      warnings.push('City is missing');
+    }
+  }
   
   return {
     isValid: errors.length === 0,
