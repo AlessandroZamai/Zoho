@@ -11,59 +11,60 @@ function validateRowDataUnified(rowData, rowNumber) {
   const errors = [];
   const warnings = [];
   
-  // Required fields validation
-  if (!rowData[0] || rowData[0].toString().trim() === '') {
+  // Required fields validation using column constants
+  if (!getColumnValue(rowData, 'FIRST_NAME') || getColumnValue(rowData, 'FIRST_NAME').toString().trim() === '') {
     errors.push('First Name is required');
   }
   
-  if (!rowData[1] || rowData[1].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'LAST_NAME') || getColumnValue(rowData, 'LAST_NAME').toString().trim() === '') {
     errors.push('Last Name is required');
   }
   
-  if (!rowData[2] || rowData[2].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'PHONE') || getColumnValue(rowData, 'PHONE').toString().trim() === '') {
     errors.push('Phone is required');
   } else {
     // Validate phone format
-    const phone = String(rowData[2]).replace(/[^0-9+]/g, '');
+    const phone = String(getColumnValue(rowData, 'PHONE')).replace(/[^0-9+]/g, '');
     if (phone.length < 10) {
       errors.push('Phone must contain at least 10 digits');
     }
   }
   
-  if (!rowData[3] || rowData[3].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'EMAIL') || getColumnValue(rowData, 'EMAIL').toString().trim() === '') {
     errors.push('Email is required');
   } else {
     // Basic email validation
-    const email = rowData[3].toString().trim();
+    const email = getColumnValue(rowData, 'EMAIL').toString().trim();
     if (!email.includes('@') || !email.includes('.')) {
       errors.push('Email format appears invalid');
     }
   }
   
-  if (!rowData[5] || rowData[5].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'CAMPAIGN_NAME') || getColumnValue(rowData, 'CAMPAIGN_NAME').toString().trim() === '') {
     errors.push('Campaign Name is required');
   }
   
-  // Validate Preferred Language field (column 4)
-  if (rowData[4] && rowData[4].toString().trim() !== '') {
-    const languagePreference = rowData[4].toString().trim().toLowerCase();
+  // Validate Preferred Language field
+  const preferredLanguage = getColumnValue(rowData, 'PREFERRED_LANGUAGE');
+  if (preferredLanguage && preferredLanguage.toString().trim() !== '') {
+    const languagePreference = preferredLanguage.toString().trim().toLowerCase();
     if (languagePreference !== 'en-ca' && languagePreference !== 'fr-ca') {
       errors.push('Preferred Language must be either "en-ca" or "fr-ca"');
     }
   }
   
   // Optional field warnings
-  if (!rowData[8] || rowData[8].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'STREET') || getColumnValue(rowData, 'STREET').toString().trim() === '') {
     warnings.push('Street address is missing');
   }
   
-  if (!rowData[9] || rowData[9].toString().trim() === '') {
+  if (!getColumnValue(rowData, 'CITY') || getColumnValue(rowData, 'CITY').toString().trim() === '') {
     warnings.push('City is missing');
   }
   
-  // Validate assignment fields based on configuration (single dynamic column at index 15)
+  // Validate assignment fields based on configuration
   const config = getConfigurationValues();
-  const assignmentValue = rowData[15]; // Single assignment column
+  const assignmentValue = getColumnValue(rowData, 'ASSIGNMENT_VALUE');
   
   if (config.leadAssignment === 'Store') {
     if (!assignmentValue || assignmentValue.toString().trim() === '') {

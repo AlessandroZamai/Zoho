@@ -226,29 +226,29 @@ function buildZohoPayload(rowData) {
       endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
     }
     
-    // Clean phone
-    const phone = String(rowData[2]).replace(/[^0-9+]/g, '');
+    // Clean phone using column constants
+    const phone = String(getColumnValue(rowData, 'PHONE')).replace(/[^0-9+]/g, '');
     
-    // Build base payload
+    // Build base payload using column constants
     const payload = {
       auth_token_name: config.authTokenName,
       auth_token_value: config.authTokenValue,
-      First_Name: rowData[0],
-      Last_Name: rowData[1],
+      First_Name: getColumnValue(rowData, 'FIRST_NAME'),
+      Last_Name: getColumnValue(rowData, 'LAST_NAME'),
       Phone: phone,
-      Email: rowData[3],
-      Language_Preference: rowData[4],
+      Email: getColumnValue(rowData, 'EMAIL'),
+      Language_Preference: getColumnValue(rowData, 'PREFERRED_LANGUAGE'),
       Datahub_Src: "Google Apps Script " + ZOHO_VERSION,
-      Campaign_Name: rowData[5],
-      Description: rowData[6],
-      Street: rowData[7],
-      City: rowData[8],
-      State: rowData[9],
-      Zip_Code: rowData[10], // Column 11 "Postal Code" maps to API field "Zip_Code"
-      Country: rowData[11],
-      Rate_Plan_Description: rowData[12],
-      Phone_Model: rowData[13],
-      Brand: rowData[14],
+      Campaign_Name: getColumnValue(rowData, 'CAMPAIGN_NAME'),
+      Description: getColumnValue(rowData, 'DESCRIPTION'),
+      Street: getColumnValue(rowData, 'STREET'),
+      City: getColumnValue(rowData, 'CITY'),
+      State: getColumnValue(rowData, 'PROVINCE'),
+      Zip_Code: getColumnValue(rowData, 'POSTAL_CODE'), // "Postal Code" maps to API field "Zip_Code"
+      Country: getColumnValue(rowData, 'COUNTRY'),
+      Rate_Plan_Description: getColumnValue(rowData, 'RATE_PLAN'),
+      Phone_Model: getColumnValue(rowData, 'DEVICE_MODEL'),
+      Brand: getColumnValue(rowData, 'CURRENT_PROVIDER'),
       notify_record_owner: true,
       OrgTypeCode: config.orgTypeCode,
       Organization_Code: config.orgCode,
@@ -258,8 +258,8 @@ function buildZohoPayload(rowData) {
       Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
     };
     
-    // Add assignment field based on configuration (single dynamic column at index 15)
-    const assignmentValue = rowData[15]; // Single assignment column
+    // Add assignment field based on configuration
+    const assignmentValue = getColumnValue(rowData, 'ASSIGNMENT_VALUE');
     if (assignmentValue && assignmentValue.toString().trim() !== '') {
       switch (config.leadAssignment) {
         case 'Store':
@@ -349,12 +349,14 @@ function updateSpreadsheetWithResult(rowNumber, recordId) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     
-    // Update record ID column (17) - shifted left by 2 due to Datahub_Src removal
-    sheet.getRange(rowNumber, 17).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+    // Update record ID column using column constants
+    const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index for getRange
+    sheet.getRange(rowNumber, recordUrlColumn).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
     
-    // Update timestamp column (18) - shifted left by 2 due to Datahub_Src removal
+    // Update timestamp column using column constants
+    const timestampColumn = getColumnIndex('TIME_CREATED') + 1; // Convert to 1-based index for getRange
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-    sheet.getRange(rowNumber, 18).setValue(timestamp);
+    sheet.getRange(rowNumber, timestampColumn).setValue(timestamp);
     
     Logger.log('Spreadsheet updated for row ' + rowNumber);
     return { success: true };
@@ -388,9 +390,10 @@ function validateEditEvent(e) {
   
   Logger.log('Change detected in row: ' + rowToProcess);
   
-  // Check if row has already been processed
+  // Check if row has already been processed using column constants
   const sheet = SpreadsheetApp.getActiveSheet();
-  const recordIdCell = sheet.getRange(rowToProcess, 17).getValue(); // Column 17 - shifted left by 2 due to Datahub_Src removal
+  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
+  const recordIdCell = sheet.getRange(rowToProcess, recordUrlColumn).getValue();
   if (recordIdCell && recordIdCell.toString().trim() !== '') {
     Logger.log('Row ' + rowToProcess + ' has already been processed. Ignoring.');
     return null;
@@ -399,7 +402,8 @@ function validateEditEvent(e) {
   // Check if assignment column has data when ADMIN assignment is configured
   const config = getConfigurationValues();
   if (config.leadAssignment === 'ADMIN') {
-    const assignmentValue = sheet.getRange(rowToProcess, 16).getValue(); // Column 16 - assignment column
+    const assignmentColumn = getColumnIndex('ASSIGNMENT_VALUE') + 1; // Convert to 1-based index
+    const assignmentValue = sheet.getRange(rowToProcess, assignmentColumn).getValue();
     if (assignmentValue && assignmentValue.toString().trim() !== '') {
       Logger.log('Row ' + rowToProcess + ' has data in assignment column but ADMIN assignment is configured. Ignoring.');
       return null;
@@ -421,11 +425,12 @@ function getUnsubmittedRows() {
   }
   
   const unsubmittedRows = [];
+  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
   
   // Start from row 2 (skip header)
   for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
-    // Check if Record ID column (17) is empty - shifted left by 2 due to Datahub_Src removal
-    const recordIdCell = sheet.getRange(rowNum, 17).getValue();
+    // Check if Record ID column is empty using column constants
+    const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
     
     if (!recordIdCell || recordIdCell.toString().trim() === '') {
       // Get all data for this row
@@ -507,6 +512,7 @@ function getProcessedRowsCount() {
   
   let processedCount = 0;
   let totalDataRows = 0;
+  const recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
   
   // Start from row 2 (skip header)
   for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
@@ -519,8 +525,8 @@ function getProcessedRowsCount() {
     if (hasData) {
       totalDataRows++;
       
-      // Check if Record ID column (17) has data
-      const recordIdCell = sheet.getRange(rowNum, 17).getValue();
+      // Check if Record ID column has data using column constants
+      const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
       if (recordIdCell && recordIdCell.toString().trim() !== '') {
         processedCount++;
       }

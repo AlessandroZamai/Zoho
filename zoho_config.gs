@@ -286,10 +286,11 @@ function updateSpreadsheetTemplate() {
       headerRange.setBorder(true, true, true, true, true, true);
     }
     
-    // Apply column formatting for single assignment column (Column 17)
+    // Apply column formatting for assignment column using column constants
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      const assignmentRange = sheet.getRange(2, 17, lastRow - 1, 1);
+      const assignmentColumn = getColumnIndex('ASSIGNMENT_VALUE') + 1; // Convert to 1-based index
+      const assignmentRange = sheet.getRange(2, assignmentColumn, lastRow - 1, 1);
       
       if (leadAssignment === 'ADMIN') {
         // Admin assignment - disable the column since no input needed
