@@ -34,11 +34,32 @@ After logging in with clasp, you'll need to get your credentials:
    - **Windows**: `%APPDATA%\.clasprc.json`
    - **macOS/Linux**: `~/.clasprc.json`
 
-2. Copy the contents of this file - you'll need it for GitHub secrets
+2. Open the file and copy the **entire contents** - it should look like this:
+   ```json
+   {
+     "token": {
+       "access_token": "ya29.a0AfH6SMC...",
+       "refresh_token": "1//04...",
+       "scope": "https://www.googleapis.com/auth/...",
+       "token_type": "Bearer",
+       "expiry_date": 1234567890123
+     },
+     "oauth2ClientSettings": {
+       "clientId": "1234567890-abc123.apps.googleusercontent.com",
+       "clientSecret": "GOCSPX-...",
+       "redirectUri": "http://localhost"
+     },
+     "isLocalCreds": false
+   }
+   ```
+
+3. **Important**: Copy the entire JSON object exactly as shown, including all braces and quotes
 
 ## Step 3: Set up GitHub Secrets
 
-In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add:
+In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add these as **Repository secrets** (not Environment secrets):
+
+**Important**: Use the **"Repository secrets"** tab, not "Environment secrets". Repository secrets are available to all workflows in the repository.
 
 ### Required Secrets:
 

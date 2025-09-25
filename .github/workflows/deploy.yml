@@ -22,11 +22,47 @@ jobs:
         
       - name: Authenticate with Google
         run: |
+          # Create credentials file
           echo '${{ secrets.GOOGLE_CREDENTIALS }}' > ~/.clasprc.json
+          
+          # Verify credentials file was created
+          if [ ! -f ~/.clasprc.json ]; then
+            echo "Error: Credentials file not created"
+            exit 1
+          fi
+          
+          # Check if credentials file has content
+          if [ ! -s ~/.clasprc.json ]; then
+            echo "Error: Credentials file is empty"
+            exit 1
+          fi
+          
+          # Validate JSON format
+          if ! cat ~/.clasprc.json | jq . > /dev/null 2>&1; then
+            echo "Error: Invalid JSON in credentials file"
+            exit 1
+          fi
+          
+          echo "Credentials file created successfully"
           
       - name: Set up Apps Script project
         run: |
+          # Create .clasp.json file
           echo '${{ secrets.CLASP_SETTINGS }}' > .clasp.json
+          
+          # Verify .clasp.json was created
+          if [ ! -f .clasp.json ]; then
+            echo "Error: .clasp.json file not created"
+            exit 1
+          fi
+          
+          # Validate JSON format
+          if ! cat .clasp.json | jq . > /dev/null 2>&1; then
+            echo "Error: Invalid JSON in .clasp.json file"
+            exit 1
+          fi
+          
+          echo "Apps Script project configuration created successfully"
           
       - name: Update version in code
         run: |
@@ -51,10 +87,29 @@ jobs:
           }
           EOF
           
+          echo "Version file updated successfully"
+          
+      - name: Test clasp authentication
+        run: |
+          # Test if clasp can authenticate
+          echo "Testing clasp authentication..."
+          clasp login --status || echo "Not logged in, this is expected in CI"
+          
       - name: Deploy to Apps Script
         run: |
+          echo "Starting deployment..."
+          
+          # Push files to Apps Script
+          echo "Pushing files to Apps Script..."
           clasp push --force
-          DEPLOYMENT_ID=$(clasp deploy --description "Deployment $(date) - ${{ github.sha }}" | grep -o 'AKfycby[A-Za-z0-9_-]*')
+          
+          # Deploy the project
+          echo "Creating deployment..."
+          DEPLOYMENT_OUTPUT=$(clasp deploy --description "Deployment $(date) - ${{ github.sha }}")
+          echo "Deployment output: $DEPLOYMENT_OUTPUT"
+          
+          # Extract deployment ID
+          DEPLOYMENT_ID=$(echo "$DEPLOYMENT_OUTPUT" | grep -o 'AKfycby[A-Za-z0-9_-]*' || echo "No deployment ID found")
           echo "Deployed with ID: $DEPLOYMENT_ID"
           echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
           
