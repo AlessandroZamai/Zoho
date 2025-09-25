@@ -14,7 +14,6 @@ const CONFIG_CAMPAIGN_END_DATE = 'ZOHO_CAMPAIGN_END_DATE';
 const CONFIG_LEAD_ASSIGNMENT = 'ZOHO_LEAD_ASSIGNMENT';
 const CONFIG_SELECTED_FIELDS = 'ZOHO_SELECTED_FIELDS';
 const CONFIG_SETUP_COMPLETION_DATE = 'ZOHO_SETUP_COMPLETION_DATE';
-const CONFIG_ENABLED_COLUMNS = 'ZOHO_ENABLED_COLUMNS'; // Legacy - will be removed
 
 // Predefined organization settings
 const ORG_SETTINGS = {
@@ -429,7 +428,7 @@ function saveCompleteConfiguration(config) {
     properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, today);
     
     // Remove old enabledColumns property if it exists
-    properties.deleteProperty(CONFIG_ENABLED_COLUMNS);
+    properties.deleteProperty('ZOHO_ENABLED_COLUMNS');
     
     // Configure triggers and menu based on processing mode (always manual now)
     const triggerResult = configureTriggers('MANUAL');
@@ -615,25 +614,29 @@ function updateSpreadsheetTemplate() {
       headerRange.setBorder(true, true, true, true, true, true);
     }
     
-    // Apply column formatting for assignment column using column constants
+    // Apply column formatting for assignment column using dynamic mapping
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      const assignmentColumn = getColumnIndex('ASSIGNMENT_VALUE') + 1; // Convert to 1-based index
-      const assignmentRange = sheet.getRange(2, assignmentColumn, lastRow - 1, 1);
-      
-      if (leadAssignment === 'ADMIN') {
-        // Admin assignment - disable the column since no input needed
-        assignmentRange.setBackground('#f5f5f5');
-        assignmentRange.setFontColor('#9aa0a6');
-        assignmentRange.protect().setDescription('Admin assignment - no input required');
-      } else {
-        // Store or Sales Rep assignment - enable the column
-        assignmentRange.setBackground('#ffffff');
-        assignmentRange.setFontColor('#000000');
-        const description = leadAssignment === 'Store' ? 
-          'Store assignment - enter Channel Outlet ID' : 
-          'Sales Rep assignment - enter sales rep email';
-        assignmentRange.protect().setDescription(description);
+      try {
+        const assignmentColumn = getColumnIndexByApiName('AssignmentValue') + 1; // Convert to 1-based index
+        const assignmentRange = sheet.getRange(2, assignmentColumn, lastRow - 1, 1);
+        
+        if (leadAssignment === 'ADMIN') {
+          // Admin assignment - disable the column since no input needed
+          assignmentRange.setBackground('#f5f5f5');
+          assignmentRange.setFontColor('#9aa0a6');
+          assignmentRange.protect().setDescription('Admin assignment - no input required');
+        } else {
+          // Store or Sales Rep assignment - enable the column
+          assignmentRange.setBackground('#ffffff');
+          assignmentRange.setFontColor('#000000');
+          const description = leadAssignment === 'Store' ? 
+            'Store assignment - enter Channel Outlet ID' : 
+            'Sales Rep assignment - enter sales rep email';
+          assignmentRange.protect().setDescription(description);
+        }
+      } catch (error) {
+        Logger.log('Warning: Could not format assignment column - ' + error.toString());
       }
     }
     

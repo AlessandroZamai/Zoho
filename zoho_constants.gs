@@ -6,6 +6,11 @@
 // Webhook URL for Zoho API
 const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f';
 
+// Zoho CRM URLs and organization settings
+const ZOHO_CRM_BASE_URL = 'https://crm.zoho.com/crm';
+const ZOHO_ORG_ID = 'org820120607';
+const ZOHO_LEADS_PATH = 'tab/Leads';
+
 // Processing modes
 const PROCESSING_MODES = {
   AUTO: 'AUTO',
@@ -71,27 +76,6 @@ const SYSTEM_FIELDS = [
   { apiName: 'Time_Created_in_Zoho', displayName: 'Time Created in Zoho', required: false, validation: null }
 ];
 
-// Legacy column mapping constants (will be replaced by dynamic mapping)
-const COLUMN_INDICES = {
-  FIRST_NAME: 0,
-  LAST_NAME: 1,
-  PHONE: 2,
-  EMAIL: 3,
-  PREFERRED_LANGUAGE: 4,
-  CAMPAIGN_NAME: 5,
-  DESCRIPTION: 6,
-  STREET: 7,
-  CITY: 8,
-  PROVINCE: 9,
-  POSTAL_CODE: 10,
-  COUNTRY: 11,
-  RATE_PLAN: 12,
-  DEVICE_MODEL: 13,
-  CURRENT_PROVIDER: 14,
-  ASSIGNMENT_VALUE: 15,
-  ZOHO_RECORD_URL: 16,
-  TIME_CREATED: 17
-};
 
 /**
  * Get dynamic column mapping based on selected fields
@@ -102,8 +86,13 @@ function getDynamicColumnMapping() {
   const selectedFields = properties.getProperty('ZOHO_SELECTED_FIELDS');
   
   if (!selectedFields) {
-    // Fallback to legacy mapping if no fields selected
-    return getLegacyColumnMapping();
+    // Fallback to default fields if no fields selected
+    const defaultFields = getDefaultFields();
+    const mapping = {};
+    defaultFields.forEach((field, index) => {
+      mapping[field.apiName] = index;
+    });
+    return mapping;
   }
   
   try {
@@ -117,35 +106,14 @@ function getDynamicColumnMapping() {
     return mapping;
   } catch (error) {
     Logger.log('Error parsing selected fields: ' + error.toString());
-    return getLegacyColumnMapping();
+    // Fallback to default fields on error
+    const defaultFields = getDefaultFields();
+    const mapping = {};
+    defaultFields.forEach((field, index) => {
+      mapping[field.apiName] = index;
+    });
+    return mapping;
   }
-}
-
-/**
- * Get legacy column mapping for backward compatibility
- * @returns {Object} Legacy mapping
- */
-function getLegacyColumnMapping() {
-  return {
-    'First_Name': 0,
-    'Last_Name': 1,
-    'Phone': 2,
-    'Email': 3,
-    'Language_Preference': 4,
-    'Campaign_Name': 5,
-    'Description': 6,
-    'Street': 7,
-    'City': 8,
-    'State': 9,
-    'Zip_Code': 10,
-    'Country': 11,
-    'Rate_Plan_Description': 12,
-    'Phone_Model': 13,
-    'Brand': 14,
-    'AssignmentValue': 15,
-    'Zoho_Record_URL': 16,
-    'Time_Created_in_Zoho': 17
-  };
 }
 
 /**
@@ -172,28 +140,6 @@ function getColumnValueByApiName(rowData, apiName) {
   return rowData[index];
 }
 
-/**
- * Get column index by name (legacy version for backward compatibility)
- * @param {string} columnName - The column name constant
- * @returns {number} The 0-based column index
- */
-function getColumnIndex(columnName) {
-  if (COLUMN_INDICES.hasOwnProperty(columnName)) {
-    return COLUMN_INDICES[columnName];
-  }
-  throw new Error('Unknown column name: ' + columnName);
-}
-
-/**
- * Get column value from row data by column name (legacy version)
- * @param {Array} rowData - The row data array
- * @param {string} columnName - The column name constant
- * @returns {*} The column value
- */
-function getColumnValue(rowData, columnName) {
-  const index = getColumnIndex(columnName);
-  return rowData[index];
-}
 
 /**
  * Get selected fields from configuration
@@ -287,6 +233,15 @@ class ZohoConfig {
 }
 
 /**
+ * Build Zoho record URL from record ID
+ * @param {string} recordId - The Zoho record ID
+ * @returns {string} Complete URL to the record in Zoho CRM
+ */
+function buildZohoRecordUrl(recordId) {
+  return `${ZOHO_CRM_BASE_URL}/${ZOHO_ORG_ID}/${ZOHO_LEADS_PATH}/${recordId}`;
+}
+
+/**
  * Error handler for Zoho integration
  * @param {string} errorCode - Error code from ZOHO_ERROR_CODES
  * @param {Error} error - The error object
@@ -306,97 +261,4 @@ function ZohoErrorHandler_logError(errorCode, error, context = {}) {
   if (error.stack) {
     Logger.log('Stack trace: ' + error.stack);
   }
-}
-
-/**
- * Utility function to safely get property values
- * @param {string} key - Property key
- * @param {string} defaultValue - Default value if property doesn't exist
- * @returns {string} Property value or default
- */
-function getPropertySafe(key, defaultValue = null) {
-  try {
-    const properties = PropertiesService.getScriptProperties();
-    return properties.getProperty(key) || defaultValue;
-  } catch (error) {
-    Logger.log('Error getting property ' + key + ': ' + error.toString());
-    return defaultValue;
-  }
-}
-
-/**
- * Utility function to safely set property values
- * @param {string} key - Property key
- * @param {string} value - Property value
- * @returns {boolean} Success status
- */
-function setPropertySafe(key, value) {
-  try {
-    const properties = PropertiesService.getScriptProperties();
-    properties.setProperty(key, value);
-    return true;
-  } catch (error) {
-    Logger.log('Error setting property ' + key + ': ' + error.toString());
-    return false;
-  }
-}
-
-/**
- * Check if the integration is properly initialized
- * @returns {boolean} True if initialized, false otherwise
- */
-function isIntegrationInitialized() {
-  try {
-    const config = new ZohoConfig();
-    const currentConfig = config.getConfig();
-    
-    return !!(currentConfig.processingMode && 
-              currentConfig.authTokenName && 
-              currentConfig.authTokenValue && 
-              currentConfig.orgCode);
-  } catch (error) {
-    Logger.log('Error checking initialization: ' + error.toString());
-    return false;
-  }
-}
-
-/**
- * Get current timestamp in a standardized format
- * @returns {string} Formatted timestamp
- */
-function getCurrentTimestamp() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-}
-
-/**
- * Validate email format
- * @param {string} email - Email to validate
- * @returns {boolean} True if valid, false otherwise
- */
-function isValidEmail(email) {
-  if (!email || typeof email !== 'string') {
-    return false;
-  }
-  
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.trim());
-}
-
-/**
- * Clean and validate phone number
- * @param {string} phone - Phone number to clean
- * @returns {Object} Object with cleaned phone and validation status
- */
-function cleanAndValidatePhone(phone) {
-  if (!phone) {
-    return { cleaned: '', isValid: false, error: 'Phone number is required' };
-  }
-  
-  const cleaned = String(phone).replace(/[^0-9+]/g, '');
-  
-  if (cleaned.length < 10) {
-    return { cleaned: cleaned, isValid: false, error: 'Phone must contain at least 10 digits' };
-  }
-  
-  return { cleaned: cleaned, isValid: true, error: null };
 }

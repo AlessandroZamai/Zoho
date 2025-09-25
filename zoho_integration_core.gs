@@ -369,7 +369,7 @@ function updateSpreadsheetWithResult(rowNumber, recordId) {
     // Update record ID column using dynamic field mapping
     try {
       const recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index for getRange
-      sheet.getRange(rowNumber, recordUrlColumn).setValue('https://crm.zoho.com/crm/org820120607/tab/Leads/' + recordId);
+      sheet.getRange(rowNumber, recordUrlColumn).setValue(buildZohoRecordUrl(recordId));
     } catch (error) {
       Logger.log('Warning: Could not update Zoho Record URL column - ' + error.toString());
     }
@@ -459,18 +459,13 @@ function getUnsubmittedRows() {
   
   const unsubmittedRows = [];
   
-  // Try to get the record URL column using dynamic mapping, fallback to legacy if needed
+  // Try to get the record URL column using dynamic mapping
   let recordUrlColumn;
   try {
     recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
   } catch (error) {
-    Logger.log('Warning: Could not find Zoho_Record_URL column using dynamic mapping, trying legacy approach');
-    try {
-      recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
-    } catch (legacyError) {
-      Logger.log('Warning: Could not find record URL column at all - ' + legacyError.toString());
-      recordUrlColumn = null;
-    }
+    Logger.log('Warning: Could not find Zoho_Record_URL column - ' + error.toString());
+    recordUrlColumn = null;
   }
   
   // Start from row 2 (skip header)
@@ -567,18 +562,13 @@ function getProcessedRowsCount() {
   let processedCount = 0;
   let totalDataRows = 0;
   
-  // Try to get the record URL column using dynamic mapping, fallback to legacy if needed
+  // Try to get the record URL column using dynamic mapping
   let recordUrlColumn;
   try {
     recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
   } catch (error) {
-    Logger.log('Warning: Could not find Zoho_Record_URL column using dynamic mapping, trying legacy approach');
-    try {
-      recordUrlColumn = getColumnIndex('ZOHO_RECORD_URL') + 1; // Convert to 1-based index
-    } catch (legacyError) {
-      Logger.log('Warning: Could not find record URL column at all - ' + legacyError.toString());
-      recordUrlColumn = null;
-    }
+    Logger.log('Warning: Could not find Zoho_Record_URL column - ' + error.toString());
+    recordUrlColumn = null;
   }
   
   // Start from row 2 (skip header)
