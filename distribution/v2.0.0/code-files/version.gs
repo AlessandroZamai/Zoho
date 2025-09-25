@@ -1,20 +1,19 @@
-// Auto-generated version file - DO NOT EDIT MANUALLY
-// This file is updated automatically by GitHub Actions during deployment
+/**
+ * Simple version information for TELUS Zoho Integration
+ */
 
-const ADDON_VERSION = "1.0.0-dev";
-const BUILD_DATE = "2024-09-24T22:17:50Z";
-const COMMIT_HASH = "development";
+const ADDON_VERSION = "2.0";
+const BUILD_DATE = "2025-09-25";
 
 /**
- * Get version information for the add-on
+ * Get version information
  * @return {Object} Version information object
  */
 function getVersionInfo() {
   return {
     version: ADDON_VERSION,
     buildDate: BUILD_DATE,
-    commitHash: COMMIT_HASH,
-    environment: getEnvironment()
+    environment: "production"
   };
 }
 
@@ -35,9 +34,8 @@ function showVersionInfo() {
   let message = `TELUS Zoho Lead Integration Add-on\n\n`;
   message += `Version: ${info.version}\n`;
   message += `Environment: ${info.environment}\n`;
-  message += `Build Date: ${new Date(info.buildDate).toLocaleString()}\n`;
-  message += `Commit: ${info.commitHash}\n\n`;
-  message += `For updates, contact your administrator.`;
+  message += `Build Date: ${info.buildDate}\n\n`;
+  message += `For support, contact your administrator.`;
   
   SpreadsheetApp.getUi().alert('Version Information', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
