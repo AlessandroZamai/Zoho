@@ -1,30 +1,25 @@
 # Google Cloud Project Setup Guide
 
-This guide explains how to configure your existing Google Cloud Project (`n8n-gcp-api-np-53449c`) for the TELUS Zoho Lead Integration Add-on.
+This guide explains how to configure your existing Google Cloud Project (`371880869452`) for the TELUS Zoho Lead Integration Add-on.
 
 ## Prerequisites
 
-- Access to Google Cloud Project: `n8n-gcp-api-np-53449c`
+- Access to Google Cloud Project: `371880869452`
 - Google Apps Script projects for staging and production
 - Admin access to configure OAuth consent screen
 
 ## Step 1: Link Apps Script Projects to GCP
 
-### For Staging Apps Script Project:
-1. Open your staging Apps Script project
+### For Apps Script Project:
+1. Open your Apps Script project
 2. Go to **Project Settings** (gear icon)
 3. Under "Google Cloud Platform (GCP) Project"
-4. Enter project number for `n8n-gcp-api-np-53449c`
+4. Enter project number: `371880869452`
 5. Click **Set Project**
-
-### For Production Apps Script Project:
-1. Open your production Apps Script project
-2. Follow the same steps as staging
-3. Use the same GCP project: `n8n-gcp-api-np-53449c`
 
 ## Step 2: Enable Required APIs
 
-In the Google Cloud Console for project `n8n-gcp-api-np-53449c`:
+In the Google Cloud Console for project `371880869452`:
 
 1. Go to **APIs & Services > Library**
 2. Enable these APIs:
