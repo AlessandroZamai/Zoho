@@ -35,6 +35,7 @@ const ORG_SETTINGS = {
   }
 };
 
+
 /**
  * Main setup function - displays the setup wizard
  */
@@ -147,14 +148,13 @@ function setupFromConsole() {
       instructions += `Organization Type: ${organizationType}\n`;
       
       if (organizationType === 'KI' || organizationType === 'RT') {
-        // Check admin credentials
-        const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
-        const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+        // Check required properties
+        const propCheck = checkRequiredProperties();
         
-        if (!kiTokenName || !rtTokenName) {
-          instructions += '2. Missing administrator credentials. Run adminSetupCredentials() first.\n';
+        if (!propCheck.allSet) {
+          instructions += '2. Missing required script properties. Run initializeMissingProperties() and then set values in Project Settings > Script Properties.\n';
         } else {
-          instructions += '2. Administrator credentials are set.\n';
+          instructions += '2. Required script properties are set.\n';
         }
       }
       
@@ -166,7 +166,8 @@ function setupFromConsole() {
     }
     
     instructions += '\nRecommended actions:\n';
-    instructions += '- Run adminSetupCredentials() if you are an administrator\n';
+    instructions += '- Run initializeMissingProperties() to create missing script properties\n';
+    instructions += '- Run checkRequiredProperties() to verify property status\n';
     instructions += '- Open your spreadsheet and run showSetupWizard() to complete user setup\n';
     instructions += '- Use the add-on interface for configuration\n';
     
@@ -181,114 +182,59 @@ function setupFromConsole() {
 }
 
 /**
- * Administrator setup function - initializes predefined credentials for KI and RT
- * This should be run once by an administrator before users can configure KI/RT integrations
+ * Initialize missing script properties with blank values
  */
-function adminSetupCredentials() {
+function initializeMissingProperties() {
   try {
-    const ui = SpreadsheetApp.getUi();
-    
-    // Check if credentials already exist
     const properties = PropertiesService.getScriptProperties();
-    const kiTokenName = properties.getProperty('AUTH_TOKEN_NAME_KI');
-    const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
+    const requiredProperties = [
+      'AUTH_TOKEN_NAME_KI',
+      'AUTH_TOKEN_VALUE_KI', 
+      'AUTH_TOKEN_NAME_RT',
+      'AUTH_TOKEN_VALUE_RT'
+    ];
     
-    if (kiTokenName && rtTokenName) {
-      const overwrite = ui.alert(
-        'Credentials Already Exist',
-        'Predefined credentials for KI and RT organizations already exist. Do you want to overwrite them?',
-        ui.ButtonSet.YES_NO
-      );
-      
-      if (overwrite !== ui.Button.YES) {
-        return { success: false, message: 'Setup cancelled by user' };
+    const missingProperties = [];
+    
+    // Check which properties are missing
+    requiredProperties.forEach(prop => {
+      if (!properties.getProperty(prop)) {
+        missingProperties.push(prop);
       }
-    }
-    
-    // Security warning
-    const securityWarning = ui.alert(
-      'Administrator Credential Setup',
-      'This will set up predefined credentials for Corporate Store (KI) and Mobile Klinik (RT) organizations.\n\nMake sure you are in a secure environment and no one can see your screen.\n\nContinue?',
-      ui.ButtonSet.YES_NO
-    );
-    
-    if (securityWarning !== ui.Button.YES) {
-      return { success: false, message: 'Setup cancelled by user' };
-    }
-    
-    // Get KI credentials
-    const kiTokenNameInput = ui.prompt(
-      'Corporate Store (KI) - Token Name', 
-      'Enter the auth token name for Corporate Store (KI):\n(e.g., telus_gapps_token)'
-    );
-    
-    if (kiTokenNameInput.getSelectedButton() !== ui.Button.OK || !kiTokenNameInput.getResponseText()) {
-      throw new Error('KI token name is required');
-    }
-    
-    const kiTokenValueInput = ui.prompt(
-      'Corporate Store (KI) - Token Value', 
-      'Enter the auth token value for Corporate Store (KI):'
-    );
-    
-    if (kiTokenValueInput.getSelectedButton() !== ui.Button.OK || !kiTokenValueInput.getResponseText()) {
-      throw new Error('KI token value is required');
-    }
-    
-    // Get RT credentials  
-    const rtTokenNameInput = ui.prompt(
-      'Mobile Klinik (RT) - Token Name', 
-      'Enter the auth token name for Mobile Klinik (RT):\n(e.g., mobile_klinik_gapps_token)'
-    );
-    
-    if (rtTokenNameInput.getSelectedButton() !== ui.Button.OK || !rtTokenNameInput.getResponseText()) {
-      throw new Error('RT token name is required');
-    }
-    
-    const rtTokenValueInput = ui.prompt(
-      'Mobile Klinik (RT) - Token Value', 
-      'Enter the auth token value for Mobile Klinik (RT):'
-    );
-    
-    if (rtTokenValueInput.getSelectedButton() !== ui.Button.OK || !rtTokenValueInput.getResponseText()) {
-      throw new Error('RT token value is required');
-    }
-    
-    // Store credentials securely
-    properties.setProperties({
-      'AUTH_TOKEN_NAME_KI': kiTokenNameInput.getResponseText(),
-      'AUTH_TOKEN_VALUE_KI': kiTokenValueInput.getResponseText(),
-      'AUTH_TOKEN_NAME_RT': rtTokenNameInput.getResponseText(),
-      'AUTH_TOKEN_VALUE_RT': rtTokenValueInput.getResponseText()
     });
     
-    Logger.log('Administrator credentials initialized securely');
-    
-    ui.alert(
-      'Setup Complete',
-      'Predefined credentials for Corporate Store (KI) and Mobile Klinik (RT) have been stored securely.\n\nUsers can now configure their integrations using the setup wizard.',
-      ui.ButtonSet.OK
-    );
-    
-    return { success: true, message: 'Administrator credentials initialized securely' };
+    if (missingProperties.length > 0) {
+      // Set missing properties to blank values
+      const propsToSet = {};
+      missingProperties.forEach(prop => {
+        propsToSet[prop] = '';
+      });
+      properties.setProperties(propsToSet);
+      
+      const ui = SpreadsheetApp.getUi();
+      ui.alert(
+        'Missing Properties Initialized',
+        `The following script properties were missing and have been initialized with blank values:\n\n${missingProperties.join('\n')}\n\nPlease go to Extensions > Apps Script > Project Settings > Script Properties and enter the correct values for these properties.`,
+        ui.ButtonSet.OK
+      );
+      
+      Logger.log('Initialized missing properties: ' + missingProperties.join(', '));
+      return { success: true, message: 'Missing properties initialized', missingProperties: missingProperties };
+    } else {
+      Logger.log('All required properties are present');
+      return { success: true, message: 'All required properties are present', missingProperties: [] };
+    }
     
   } catch (error) {
-    Logger.log('Error in administrator credential setup: ' + error.toString());
-    
-    SpreadsheetApp.getUi().alert(
-      'Setup Error',
-      'Failed to set up administrator credentials: ' + error.toString(),
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    
+    Logger.log('Error initializing missing properties: ' + error.toString());
     return { success: false, message: error.toString() };
   }
 }
 
 /**
- * Verify administrator credentials are set up
+ * Check and report status of required script properties
  */
-function verifyAdminCredentials() {
+function checkRequiredProperties() {
   try {
     const properties = PropertiesService.getScriptProperties();
     
@@ -297,33 +243,36 @@ function verifyAdminCredentials() {
     const rtTokenName = properties.getProperty('AUTH_TOKEN_NAME_RT');
     const rtTokenValue = properties.getProperty('AUTH_TOKEN_VALUE_RT');
     
-    let message = 'Administrator Credentials Status:\n\n';
+    let message = 'Required Script Properties Status:\n\n';
     
     message += 'Corporate Store (KI):\n';
-    message += `- Token Name: ${kiTokenName ? '✅ Set' : '❌ Missing'}\n`;
-    message += `- Token Value: ${kiTokenValue ? '✅ Set' : '❌ Missing'}\n\n`;
+    message += `- AUTH_TOKEN_NAME_KI: ${kiTokenName ? '✅ Set' : '❌ Missing/Empty'}\n`;
+    message += `- AUTH_TOKEN_VALUE_KI: ${kiTokenValue ? '✅ Set' : '❌ Missing/Empty'}\n\n`;
     
     message += 'Mobile Klinik (RT):\n';
-    message += `- Token Name: ${rtTokenName ? '✅ Set' : '❌ Missing'}\n`;
-    message += `- Token Value: ${rtTokenValue ? '✅ Set' : '❌ Missing'}\n\n`;
+    message += `- AUTH_TOKEN_NAME_RT: ${rtTokenName ? '✅ Set' : '❌ Missing/Empty'}\n`;
+    message += `- AUTH_TOKEN_VALUE_RT: ${rtTokenValue ? '✅ Set' : '❌ Missing/Empty'}\n\n`;
     
     const allSet = kiTokenName && kiTokenValue && rtTokenName && rtTokenValue;
     
     if (allSet) {
-      message += '✅ All administrator credentials are properly configured\n\n';
+      message += '✅ All required properties are configured\n\n';
       message += 'Users can now configure KI and RT integrations using the setup wizard.';
     } else {
-      message += '❌ Some administrator credentials are missing\n\n';
-      message += 'Run adminSetupCredentials() to set up missing credentials.';
+      message += '❌ Some required properties are missing or empty\n\n';
+      message += 'To fix this:\n';
+      message += '1. Run initializeMissingProperties() to create missing properties\n';
+      message += '2. Go to Extensions > Apps Script > Project Settings > Script Properties\n';
+      message += '3. Enter the correct values for the missing/empty properties';
     }
     
     SpreadsheetApp.getUi().alert(
-      'Administrator Credential Verification',
+      'Required Properties Check',
       message,
       SpreadsheetApp.getUi().ButtonSet.OK
     );
     
-    Logger.log('Administrator credential verification: ' + message);
+    Logger.log('Required properties check: ' + message);
     
     return {
       success: true,
@@ -335,7 +284,7 @@ function verifyAdminCredentials() {
     };
     
   } catch (error) {
-    Logger.log('Error verifying administrator credentials: ' + error.toString());
+    Logger.log('Error checking required properties: ' + error.toString());
     return { success: false, message: error.toString() };
   }
 }
@@ -368,11 +317,25 @@ function saveCompleteConfiguration(config) {
     const orgSettings = ORG_SETTINGS[config.organizationType];
     if (config.organizationType === 'DL') {
       // Dealership - save user-provided credentials
+      if (!config.orgCode) {
+        throw new Error('Organization code is required for Dealers');
+      }
+      if (!config.authTokenName) {
+        throw new Error('Auth token name is required for Dealers');
+      }
+      if (!config.authTokenValue) {
+        throw new Error('Auth token value is required for Dealers');
+      }
+      
       properties.setProperty(CONFIG_ORG_CODE, config.orgCode);
       properties.setProperty(CONFIG_AUTH_TOKEN_NAME, config.authTokenName);
       properties.setProperty(CONFIG_AUTH_TOKEN_VALUE, config.authTokenValue);
     } else {
       // Corporate Store or Mobile Klinik - use predefined settings
+      if (!orgSettings || !orgSettings.orgCode) {
+        throw new Error(`Organization settings not found for ${config.organizationType}`);
+      }
+      
       properties.setProperty(CONFIG_ORG_CODE, orgSettings.orgCode);
       
       // Get predefined credentials from script properties
@@ -380,7 +343,12 @@ function saveCompleteConfiguration(config) {
       const authTokenValue = properties.getProperty(orgSettings.authTokenValueKey);
       
       if (!authTokenName || !authTokenValue) {
-        throw new Error(`Predefined credentials not found for ${config.organizationType}. Please contact your administrator.`);
+        const orgTypeName = config.organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik';
+        const missingTokens = [];
+        if (!authTokenName) missingTokens.push(orgSettings.authTokenNameKey);
+        if (!authTokenValue) missingTokens.push(orgSettings.authTokenValueKey);
+        
+        throw new Error(`${orgTypeName} credentials not configured. Missing: ${missingTokens.join(', ')}\n\nTo fix this:\n1. Go to Extensions > Apps Script\n2. Click Project Settings (gear icon)\n3. Scroll to Script Properties\n4. Add the missing properties with their values\n5. Save and try setup again\n\nIf you don't have these credentials, contact your TELUS administrator.`);
       }
       
       properties.setProperty(CONFIG_AUTH_TOKEN_NAME, authTokenName);
@@ -503,9 +471,22 @@ function getExistingConfiguration() {
     organizationType: properties.getProperty(CONFIG_ORGANIZATION_TYPE),
     processingMode: properties.getProperty(CONFIG_PROCESSING_MODE),
     orgCode: properties.getProperty(CONFIG_ORG_CODE),
+    authTokenName: properties.getProperty(CONFIG_AUTH_TOKEN_NAME),
+    authTokenValue: properties.getProperty(CONFIG_AUTH_TOKEN_VALUE),
     campaignStartDate: properties.getProperty(CONFIG_CAMPAIGN_START_DATE),
     campaignEndDate: properties.getProperty(CONFIG_CAMPAIGN_END_DATE),
-    leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT)
+    leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT),
+    setupCompletionDate: properties.getProperty(CONFIG_SETUP_COMPLETION_DATE)
+  };
+}
+
+/**
+ * Get setup completion date to determine if this is first-time setup
+ */
+function getSetupCompletionDate() {
+  const properties = PropertiesService.getScriptProperties();
+  return {
+    setupCompletionDate: properties.getProperty(CONFIG_SETUP_COMPLETION_DATE)
   };
 }
 
@@ -715,12 +696,14 @@ function updateSpreadsheetWithSelectedFields() {
 }
 
 /**
- * Highlight required columns in the spreadsheet
+ * Highlight required columns and add notes to the spreadsheet
  */
 function highlightRequiredColumns(selectedFields) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
-    const lastRow = Math.max(sheet.getLastRow(), 100); // Apply to at least 100 rows
+    const lastRow = Math.max(sheet.getLastRow(), 1000); // Apply to at least 1000 rows
+    const properties = PropertiesService.getScriptProperties();
+    const leadAssignment = properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep';
     
     selectedFields.forEach((field, index) => {
       if (field.required) {
@@ -752,6 +735,48 @@ function highlightRequiredColumns(selectedFields) {
         }
         
         Logger.log(`Highlighted required column: ${field.displayName} (column ${columnIndex})`);
+      } else if (field.apiName === 'AssignmentValue') {
+        // Special handling for assignment column based on lead assignment strategy
+        const columnIndex = index + 1; // Convert to 1-based index
+        const headerCell = sheet.getRange(1, columnIndex);
+        
+        if (leadAssignment === 'ADMIN') {
+          // Admin assignment - black background, white text, disabled input
+          headerCell.setBackground('#000000'); // Black background
+          headerCell.setFontColor('#ffffff'); // White text
+          headerCell.setFontWeight('bold');
+          headerCell.setNote('🚫 ADMIN ASSIGNMENT - No input required, leads automatically assigned to admin');
+          
+          if (lastRow > 1) {
+            const dataRange = sheet.getRange(2, columnIndex, lastRow - 1, 1);
+            dataRange.setBackground('#000000'); // Black background for data cells
+            dataRange.setFontColor('#ffffff'); // White text for data cells
+            
+            // Add data validation to reject any input
+            const rejectRule = SpreadsheetApp.newDataValidation()
+              .requireTextContains('=NOT(ISBLANK(A1))') // Only allow empty values
+              .setAllowInvalid(false)
+              .setHelpText('No input required. Record will automatically be assigned to your Zoho Dealer Admin.')
+              .build();
+            
+            dataRange.setDataValidation(rejectRule);
+            
+            // Set default value to indicate admin assignment
+            const adminValues = Array(lastRow - 1).fill(['ADMIN']);
+            dataRange.setValues(adminValues);
+          }
+          
+          Logger.log(`Applied Admin assignment formatting to column: ${field.displayName} (column ${columnIndex})`);
+        } else {
+          // Store or Sales Rep assignment - normal formatting
+          if (leadAssignment === 'Store') {
+            headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 11-digit ChannelOutletID (store long-code)');
+          } else {
+            headerCell.setNote('👤 SALES REP ASSIGNMENT - Enter the sales rep email address');
+          }
+          
+          Logger.log(`Applied ${leadAssignment} assignment formatting to column: ${field.displayName} (column ${columnIndex})`);
+        }
       } else if (field.apiName === 'ChannelOutletId') {
         // Special handling for store assignment field
         const columnIndex = index + 1; // Convert to 1-based index
@@ -780,7 +805,7 @@ function applyDataValidationToSheet() {
     selectedFields.forEach((field, index) => {
       if (field.validation && field.validation.length > 0) {
         const columnIndex = index + 1; // Convert to 1-based index
-        const lastRow = Math.max(sheet.getLastRow(), 100); // Apply to at least 100 rows
+        const lastRow = Math.max(sheet.getLastRow(), 1000); // Apply to at least 1000 rows
         
         if (lastRow > 1) {
           const range = sheet.getRange(2, columnIndex, lastRow - 1, 1);

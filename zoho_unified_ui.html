@@ -457,14 +457,20 @@
                 <div class="step-dot" id="dot5"></div>
             </div>
 
-            <!-- Loading State -->
-            <div class="loading" id="loadingState">
-                <div class="spinner"></div>
-                <p>Setting up your integration...</p>
-            </div>
+        <!-- Initial Loading State -->
+        <div class="loading active" id="initialLoadingState">
+            <div class="spinner"></div>
+            <p>Loading setup wizard...</p>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading" id="loadingState">
+            <div class="spinner"></div>
+            <p>Setting up your integration...</p>
+        </div>
 
             <!-- Step 1: Organization Detection -->
-            <div class="step active" id="step1">
+            <div class="step" id="step1">
                 <h2 style="margin-bottom: 24px;">Organization Setup</h2>
                 
                 <div class="form-group" id="orgTypeGroup">
@@ -1148,13 +1154,155 @@
             if (result.success) {
                 showSuccessStep();
             } else {
-                alert('Configuration failed: ' + result.message);
+                showConfigurationError(result.message);
             }
         }
 
         function onConfigurationError(error) {
             hideLoading();
-            alert('Error saving configuration: ' + error.toString());
+            showConfigurationError('Error saving configuration: ' + error.toString());
+        }
+
+        function showConfigurationError(errorMessage) {
+            // Hide loading state first
+            hideLoading();
+            
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            
+            // Show error step
+            showErrorStep(errorMessage);
+        }
+
+        function showErrorStep(errorMessage) {
+            // Create error step if it doesn't exist
+            let errorStep = document.getElementById('stepError');
+            if (!errorStep) {
+                errorStep = document.createElement('div');
+                errorStep.className = 'step';
+                errorStep.id = 'stepError';
+                
+                // Insert before the success step
+                const successStep = document.getElementById('stepSuccess');
+                successStep.parentNode.insertBefore(errorStep, successStep);
+            }
+            
+            // Format the error message for better readability
+            const formattedMessage = formatErrorMessage(errorMessage);
+            
+            errorStep.innerHTML = `
+                <div class="alert alert-error">
+                    <h3 style="margin-bottom: 12px;">❌ Configuration Error</h3>
+                    <p>There was an issue saving your configuration:</p>
+                </div>
+
+                <div class="error-details" style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #dc3545;">
+                    <h4 style="margin-bottom: 12px; color: #dc3545;">Error Details:</h4>
+                    <div style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; background: white; padding: 15px; border-radius: 4px; border: 1px solid #dee2e6; max-height: 300px; overflow-y: auto;">${formattedMessage}</div>
+                </div>
+            `;
+            
+            // Show the error step
+            errorStep.classList.add('active');
+            
+            // Update navigation buttons for error step
+            document.getElementById('prevBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('finishBtn').style.display = 'none';
+            
+            // Add error-specific buttons
+            const buttonGroup = document.querySelector('.button-group');
+            buttonGroup.innerHTML = `
+                <button class="btn btn-secondary" onclick="copyErrorToClipboard()">Copy Error Details</button>
+                <button class="btn btn-primary" onclick="returnToSetup()">Try Again</button>
+            `;
+        }
+
+        function formatErrorMessage(message) {
+            // Replace \n with actual line breaks and format for better readability
+            return message
+                .replace(/\\n/g, '\n')
+                .replace(/\n\n/g, '\n\n')
+                .trim();
+        }
+
+        function copyErrorToClipboard() {
+            const errorDetails = document.querySelector('.error-details div');
+            if (errorDetails) {
+                const textToCopy = errorDetails.textContent;
+                
+                // Try to use the modern clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        showCopyFeedback('Error details copied to clipboard!');
+                    }).catch(() => {
+                        fallbackCopyToClipboard(textToCopy);
+                    });
+                } else {
+                    fallbackCopyToClipboard(textToCopy);
+                }
+            }
+        }
+
+        function fallbackCopyToClipboard(text) {
+            // Fallback method for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showCopyFeedback('Error details copied to clipboard!');
+            } catch (err) {
+                showCopyFeedback('Unable to copy. Please select and copy the text manually.');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        function showCopyFeedback(message) {
+            // Show temporary feedback
+            const copyBtn = document.querySelector('button[onclick="copyErrorToClipboard()"]');
+            if (copyBtn) {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = message;
+                copyBtn.disabled = true;
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        function returnToSetup() {
+            // Reset to step 1 and clear any error state
+            currentStep = 1;
+            
+            // Hide error step
+            const errorStep = document.getElementById('stepError');
+            if (errorStep) {
+                errorStep.classList.remove('active');
+            }
+            
+            // Reset navigation buttons
+            const buttonGroup = document.querySelector('.button-group');
+            buttonGroup.innerHTML = `
+                <button class="btn btn-secondary" id="prevBtn" onclick="previousStep()" style="display: none;">Previous</button>
+                <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next</button>
+                <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()" style="display: none;">Finish</button>
+            `;
+            
+            // Show step 1
+            updateStepDisplay();
+            updateButtonState();
         }
 
         function showSuccessStep() {
@@ -1233,6 +1381,12 @@
         function hideLoading() {
             document.getElementById('loadingState').classList.remove('active');
             document.getElementById('nextBtn').disabled = false;
+        }
+
+        function hideInitialLoader() {
+            // Hide the initial loading state and show the actual setup wizard
+            document.getElementById('initialLoadingState').classList.remove('active');
+            document.getElementById('step1').classList.add('active');
         }
 
         function finishSetup() {
@@ -1365,6 +1519,7 @@
                 ]
             };
             populateFieldOptions(fallbackFields);
+            hideInitialLoader();
         }
 
         function populateFieldOptions(fields) {
@@ -1474,6 +1629,48 @@
                 if (config.organizationType) {
                     document.getElementById('organizationType').value = config.organizationType;
                     handleOrganizationTypeChange(); // This will show/hide appropriate fields
+                    
+                    // For Dealer (DL), also populate the auth token fields and org code
+                    if (config.organizationType === 'DL') {
+                        // Use a small delay to ensure the fields are visible before populating
+                        setTimeout(function() {
+                            // Get the current auth token values from the configuration
+                            google.script.run
+                                .withSuccessHandler(function(configValues) {
+                                    console.log('Loading dealer config values:', configValues);
+                                    if (configValues.authTokenName) {
+                                        document.getElementById('authTokenName').value = configValues.authTokenName;
+                                    }
+                                    if (configValues.authTokenValue) {
+                                        document.getElementById('authTokenValue').value = configValues.authTokenValue;
+                                    }
+                                    if (configValues.orgCode) {
+                                        document.getElementById('orgCode').value = configValues.orgCode;
+                                    }
+                                    updateButtonState();
+                                    hideInitialLoader();
+                                })
+                                .withFailureHandler(function(error) {
+                                    console.error('Error loading dealer configuration values:', error);
+                                    // Fallback: try to get values directly from the existing config
+                                    if (config.orgCode) {
+                                        document.getElementById('orgCode').value = config.orgCode;
+                                    }
+                                    if (config.authTokenName) {
+                                        document.getElementById('authTokenName').value = config.authTokenName;
+                                    }
+                                    if (config.authTokenValue) {
+                                        document.getElementById('authTokenValue').value = config.authTokenValue;
+                                    }
+                                    updateButtonState();
+                                    hideInitialLoader();
+                                })
+                                .getConfigurationValues();
+                        }, 100); // Small delay to ensure DOM is ready
+                    } else {
+                        // For non-dealer organizations, hide loader immediately
+                        hideInitialLoader();
+                    }
                 }
                 
                 // Pre-populate processing mode
@@ -1514,6 +1711,7 @@
                 console.log('Configuration loaded successfully');
             } else {
                 console.log('No existing configuration found, using defaults');
+                hideInitialLoader();
             }
             
             // Update button state after loading configuration
@@ -1523,6 +1721,7 @@
         function onExistingConfigurationError(error) {
             console.error('Error loading existing configuration:', error);
             // Continue with default values if configuration loading fails
+            hideInitialLoader();
         }
 
         function loadExistingSelectedFields() {
@@ -1537,47 +1736,52 @@
             if (existingSelectedFields && existingSelectedFields.length > 0) {
                 console.log('Loading existing selected fields:', existingSelectedFields);
                 
-                // Check if these are actually saved fields (not just defaults)
-                // If the fields include hidden/system fields, it means they were saved from a previous configuration
-                const hasHiddenFields = existingSelectedFields.some(field => 
-                    field.apiName === 'Datahub_Src' || 
-                    field.apiName === 'AssignmentValue' || 
-                    field.apiName === 'Zoho_Record_URL'
-                );
-                
-                if (hasHiddenFields) {
-                    // This is a real saved configuration, restore the field selections
-                    console.log('Found saved configuration, restoring field selections');
-                    
-                    // Clear current selection (except required fields which are always selected)
-                    selectedFields = selectedFields.filter(field => field.required);
-                    
-                    // Add existing selected fields to the selection (only user-selectable fields)
-                    existingSelectedFields.forEach(existingField => {
-                        // Skip hidden and system fields for UI purposes
-                        if (existingField.apiName !== 'Datahub_Src' && 
-                            existingField.apiName !== 'AssignmentValue' && 
-                            existingField.apiName !== 'Zoho_Record_URL' && 
-                            existingField.apiName !== 'Time_Created_in_Zoho' &&
-                            existingField.apiName !== 'custom_email_notify_list' &&
-                            existingField.apiName !== 'ChannelOutletId_Updated' &&
-                            existingField.apiName !== 'OutletId') {
+                // Check if this is a real saved configuration by looking for setup completion date
+                google.script.run
+                    .withSuccessHandler(function(config) {
+                        const hasSetupDate = config && config.setupCompletionDate;
+                        
+                        if (hasSetupDate) {
+                            // This is a real saved configuration, restore the field selections
+                            console.log('Found saved configuration with setup date, restoring field selections');
                             
-                            // Check if this field is not already in selectedFields
-                            const isAlreadySelected = selectedFields.some(field => field.apiName === existingField.apiName);
-                            if (!isAlreadySelected) {
-                                selectedFields.push(existingField);
-                            }
+                            // Clear current selection (except required fields which are always selected)
+                            selectedFields = selectedFields.filter(field => field.required);
+                            
+                            // Add existing selected fields to the selection (only user-selectable fields)
+                            existingSelectedFields.forEach(existingField => {
+                                // Skip hidden and system fields for UI purposes
+                                if (existingField.apiName !== 'Datahub_Src' && 
+                                    existingField.apiName !== 'AssignmentValue' && 
+                                    existingField.apiName !== 'Zoho_Record_URL' && 
+                                    existingField.apiName !== 'Time_Created_in_Zoho' &&
+                                    existingField.apiName !== 'custom_email_notify_list' &&
+                                    existingField.apiName !== 'ChannelOutletId_Updated' &&
+                                    existingField.apiName !== 'OutletId') {
+                                    
+                                    // Check if this field is not already in selectedFields
+                                    const isAlreadySelected = selectedFields.some(field => field.apiName === existingField.apiName);
+                                    if (!isAlreadySelected) {
+                                        selectedFields.push(existingField);
+                                    }
+                                }
+                            });
+                            
+                            // Update UI to reflect the selections
+                            updateFieldSelectionUI();
+                        } else {
+                            console.log('No setup completion date found - this is first-time setup, not pre-selecting optional fields');
+                            // For first-time setup, don't pre-select any optional fields
+                            // selectedFields already contains only required fields from populateFieldOptions
                         }
-                    });
-                    
-                    // Update UI to reflect the selections
-                    updateFieldSelectionUI();
-                } else {
-                    console.log('No saved configuration found, using default field selection');
-                }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error checking setup completion date:', error);
+                        // On error, assume first-time setup and don't pre-select optional fields
+                    })
+                    .getSetupCompletionDate();
             } else {
-                console.log('No existing selected fields found');
+                console.log('No existing selected fields found - first-time setup');
             }
         }
 

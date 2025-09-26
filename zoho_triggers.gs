@@ -41,7 +41,7 @@ function showFirstTimeSetupIfNeeded() {
           if (!kiTokenName || !rtTokenName) {
             SpreadsheetApp.getUi().alert(
               'Administrator Setup Required',
-              `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to run "adminSetupCredentials" in Apps Script, or complete the setup wizard.`,
+              `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to:\n1. Run "initializeMissingProperties()" in Apps Script\n2. Set values in Project Settings > Script Properties\n\nOr complete the setup wizard.`,
               SpreadsheetApp.getUi().ButtonSet.OK
             );
             return;
@@ -118,7 +118,7 @@ function onOpenEnhanced() {
         if (!kiTokenName || !rtTokenName) {
           SpreadsheetApp.getUi().alert(
             'Administrator Setup Required',
-            `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to run "adminSetupCredentials" in Apps Script, or complete the setup wizard.`,
+            `Configuration incomplete: Administrator credentials for ${organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik'} are missing.\n\nPlease contact your administrator to:\n1. Run "initializeMissingProperties()" in Apps Script\n2. Set values in Project Settings > Script Properties\n\nOr complete the setup wizard.`,
             SpreadsheetApp.getUi().ButtonSet.OK
           );
           return;
