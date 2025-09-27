@@ -165,6 +165,8 @@ function createCustomMenu() {
   ui.createMenu('Send to Zoho')
     .addItem('Send unsubmitted rows to Zoho', 'sendUnsubmittedRowsToZoho')
     .addSeparator()
+    .addItem('Find & Delete Duplicates', 'showDuplicateDeletionDialog')
+    .addSeparator()
     .addItem('Settings', 'showSetupWizard')
     .addItem('Reset sheet', 'resetSheetData')
     .addToUi();
