@@ -97,6 +97,12 @@
       border-left-color: #fbbc04;
       color: #e37400;
     }
+
+    .result-duplicate {
+      background-color: #fef7e0;
+      border-left-color: #fbbc04;
+      color: #e37400;
+    }
     
     .result-processing {
       background-color: #e8f0fe;
@@ -155,7 +161,14 @@
       background-color: #dadce0;
       cursor: not-allowed;
     }
-    
+
+    .delete-btn {
+        background-color: #ea4335;
+    }
+
+    .delete-btn:hover {
+        background-color: #d93025;
+    }
     
     .spinner {
       border: 3px solid #f3f3f3;
@@ -217,11 +230,13 @@
         <div class="summary-item summary-success" id="successCount">✅ Successful: 0</div>
         <div class="summary-item summary-error" id="errorCount">❌ Failed: 0</div>
         <div class="summary-item summary-warning" id="warningCount">⚠️ Warnings: 0</div>
+        <div class="summary-item summary-warning" id="duplicateCount">🗑️ Duplicates: 0</div>
       </div>
       <div id="resultsList"></div>
     </div>
     
     <div class="footer">
+      <button onclick="deleteDuplicates()" class="close-btn delete-btn" id="deleteDuplicatesBtn" disabled>Delete Duplicates</button>
       <button onclick="closeDialog()" class="close-btn" id="closeBtn" disabled>Close</button>
     </div>
   </div>
@@ -234,6 +249,9 @@
     let successCount = 0;
     let errorCount = 0;
     let warningCount = 0;
+    let duplicateCount = 0;
+    // This will hold the full duplicate info object for the new dialog
+    let duplicateInfo = {};
     
     // Start processing when dialog loads
     window.onload = function() {
@@ -266,7 +284,7 @@
         return;
       }
       
-      updateStatus('Processing ' + totalRows + ' unsubmitted rows...', false);
+      updateStatus('Checking for duplicates and processing ' + totalRows + ' unsubmitted rows...', false);
       
       // Start processing all rows
       google.script.run
@@ -288,22 +306,33 @@
       }
     }
     
-    function onProcessingComplete(processingResults) {
+    function onProcessingComplete(data) {
       processingComplete = true;
-      results = processingResults;
+      // The server now returns a complex object
+      results = data.results;
+      duplicateInfo = {
+        unsubmittedDuplicateRows: data.unsubmittedDuplicateRows,
+        topStats: data.duplicateStats.slice(0, 3)
+      };
       
-      // Count results
+      // Reset counters
       successCount = 0;
       errorCount = 0;
       warningCount = 0;
+      duplicateCount = 0;
       
       results.forEach(result => {
+        if (result.isDuplicate) {
+          duplicateCount++;
+        }
+
         if (result.success) {
           successCount++;
           if (result.validationWarnings && result.validationWarnings.length > 0) {
             warningCount++;
           }
         } else {
+          // All non-successes are counted as errors, including duplicates
           errorCount++;
         }
       });
@@ -325,11 +354,15 @@
       
       results.forEach(result => {
         const resultItem = document.createElement('div');
-        resultItem.className = 'result-item ' + (result.success ? 'result-success' : 'result-error');
         
         let content = `<span class="row-number">Row ${result.rowNumber}:</span>`;
         
-        if (result.success) {
+        if (result.isDuplicate) {
+          resultItem.className = 'result-item result-duplicate';
+          content += `Marked as duplicate`;
+          content += `<div class="error-details">This row has the same phone or email as another row.</div>`;
+        } else if (result.success) {
+          resultItem.className = 'result-item result-success';
           content += `Successfully sent to Zoho`;
           if (result.recordId) {
             content += `<a href="https://crm.zoho.com/crm/org820120607/tab/Leads/${result.recordId}" target="_blank" class="record-link">View in Zoho CRM</a>`;
@@ -338,13 +371,11 @@
             content += `<div class="error-details">Warnings: ${result.validationWarnings.join(', ')}</div>`;
           }
         } else {
+          resultItem.className = 'result-item result-error';
           content += `Failed to send`;
-          // Show either the error message OR validation errors, not both to avoid duplication
           if (result.error) {
-            // If error contains "Validation failed:", just show the error message
             content += `<div class="error-details">${result.error}</div>`;
           } else if (result.validationErrors && result.validationErrors.length > 0) {
-            // Only show validation errors if there's no error message
             content += `<div class="error-details">Validation errors: ${result.validationErrors.join(', ')}</div>`;
           }
         }
@@ -359,6 +390,7 @@
       document.getElementById('successCount').textContent = `✅ Successful: ${successCount}`;
       document.getElementById('errorCount').textContent = `❌ Failed: ${errorCount}`;
       document.getElementById('warningCount').textContent = `⚠️ Warnings: ${warningCount}`;
+      document.getElementById('duplicateCount').textContent = `🗑️ Duplicates: ${duplicateCount}`;
       summary.style.display = 'block';
     }
     
@@ -381,10 +413,31 @@
     
     function enableButtons() {
       document.getElementById('closeBtn').disabled = false;
+      // Enable button if there are any unsubmitted duplicates to delete
+      if (duplicateInfo.unsubmittedDuplicateRows && duplicateInfo.unsubmittedDuplicateRows.length > 0) {
+        document.getElementById('deleteDuplicatesBtn').disabled = false;
+      }
     }
     
     function enableCloseButton() {
       document.getElementById('closeBtn').disabled = false;
+    }
+
+    function deleteDuplicates() {
+      if (!duplicateInfo.unsubmittedDuplicateRows || duplicateInfo.unsubmittedDuplicateRows.length === 0) {
+        alert("No unsubmitted duplicates to delete.");
+        return;
+      }
+
+      // Instead of confirm(), call the new server-side function to show the rich dialog
+      google.script.run
+        .withSuccessHandler(function() {
+          // The dialog is now open. This dialog will close, but the new one will appear.
+          // We can close this dialog for a cleaner experience.
+          google.script.host.close();
+        })
+        .withFailureHandler(onError)
+        .showDuplicateDialogWithData(duplicateInfo);
     }
     
     function showIgnoredRowsInfo(rowCounts) {

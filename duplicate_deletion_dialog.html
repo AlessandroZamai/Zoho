@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: white;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      font-size: 18px;
+      color: #202124;
+      margin-top: 0;
+    }
+    p {
+      font-size: 14px;
+      color: #5f6368;
+    }
+    .stats-section {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+    }
+    .stat-item {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .stat-item strong {
+      color: #ea4335;
+    }
+    .top-duplicates {
+      margin-top: 15px;
+    }
+    .duplicate-entry {
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #e8eaed;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-bottom: 5px;
+      display: inline-block;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: right;
+    }
+    .btn {
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 10px;
+    }
+    .delete-btn {
+      background-color: #ea4335;
+      color: white;
+    }
+    .delete-btn:hover {
+      background-color: #d93025;
+    }
+    .cancel-btn {
+      background-color: #e8eaed;
+      color: #5f6368;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🗑️ Confirm Duplicate Deletion</h2>
+    <p>The scan found unsubmitted duplicate rows in your sheet. Please review the summary below before deleting.</p>
+
+    <div class="stats-section">
+      <div class="stat-item">Total unsubmitted duplicates found: <strong id="totalDuplicates">0</strong></div>
+      <div class="top-duplicates">
+        <p><strong>Top 3 most frequent duplicates:</strong></p>
+        <div id="topDuplicatesList">
+          <!-- Stats will be populated here by the script -->
+        </div>
+      </div>
+    </div>
+
+    <p>This action will permanently delete the duplicate rows that have <strong>not</strong> been submitted to Zoho. This cannot be undone.</p>
+
+    <div class="footer">
+      <button onclick="google.script.host.close()" class="btn cancel-btn">Cancel</button>
+      <button onclick="deleteConfirmed()" class="btn delete-btn">Delete Duplicates</button>
+    </div>
+  </div>
+
+  <script>
+    let duplicateRowsToDelete = [];
+
+    window.onload = function() {
+      // The server-side function will pass the data as a stringified JSON object
+      const data = JSON.parse(<?= data ?>);
+      duplicateRowsToDelete = data.unsubmittedDuplicateRows;
+
+      document.getElementById('totalDuplicates').textContent = data.unsubmittedDuplicateRows.length;
+
+      const listElement = document.getElementById('topDuplicatesList');
+      if (data.topStats.length > 0) {
+        let listHtml = '';
+        data.topStats.forEach(stat => {
+          listHtml += `<div class="duplicate-entry">${stat.type}: ${stat.value} (found ${stat.count} times)</div>`;
+        });
+        listElement.innerHTML = listHtml;
+      } else {
+        listElement.innerHTML = '<p>No recurring duplicate values found.</p>';
+      }
+    };
+
+    function deleteConfirmed() {
+      // Disable buttons to prevent double-clicking
+      document.querySelector('.delete-btn').disabled = true;
+      document.querySelector('.cancel-btn').disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert(result.deletedCount + ' duplicate row(s) have been deleted.');
+          } else {
+            alert('An error occurred: ' + result.error);
+          }
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          alert('A critical error occurred: ' + error.message);
+          google.script.host.close();
+        })
+        .deleteSheetRows(duplicateRowsToDelete);
+    }
+  </script>
+</body>
+</html>

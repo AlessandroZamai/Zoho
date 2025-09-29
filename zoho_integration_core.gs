@@ -504,24 +504,196 @@ function getUnsubmittedRows() {
 }
 
 /**
+ * Finds duplicate rows based on Phone and Email columns and gathers statistics.
+ * @returns {object} An object containing duplicate row information:
+ *                   { Set<number> } allDuplicateRows: All subsequent rows identified as duplicates.
+ *                   { Set<number> } unsubmittedDuplicateRows: Duplicate rows that haven't been submitted.
+ *                   { Array<object> } duplicateStats: Sorted list of duplicate values and their counts.
+ */
+function findDuplicateRows() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const data = sheet.getDataRange().getValues();
+
+  // Get column indices
+  let phoneColIdx, emailColIdx, recordUrlColIdx;
+  try {
+    phoneColIdx = getColumnIndexByApiName('Phone');
+    emailColIdx = getColumnIndexByApiName('Email');
+    recordUrlColIdx = getColumnIndexByApiName('Zoho_Record_URL');
+  } catch (e) {
+    Logger.log("Error getting column indices for duplicate check: " + e.message);
+    return { allDuplicateRows: new Set(), unsubmittedDuplicateRows: new Set(), duplicateStats: [] };
+  }
+
+  // Pass 1: Collect all occurrences of each phone and email
+  const phoneOccurrences = new Map();
+  const emailOccurrences = new Map();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const rowNumber = i + 1;
+    const phone = row[phoneColIdx] ? String(row[phoneColIdx]).replace(/[^0-9]/g, '') : '';
+    const email = row[emailColIdx] ? String(row[emailColIdx]).trim().toLowerCase() : '';
+
+    if (phone) {
+      if (!phoneOccurrences.has(phone)) phoneOccurrences.set(phone, []);
+      phoneOccurrences.get(phone).push(rowNumber);
+    }
+    if (email) {
+      if (!emailOccurrences.has(email)) emailOccurrences.set(email, []);
+      emailOccurrences.get(email).push(rowNumber);
+    }
+  }
+
+  // Pass 2: Identify duplicates and gather stats
+  const allDuplicateRows = new Set();
+  const statsMap = new Map();
+
+  const processOccurrences = (occurrencesMap, type) => {
+    for (const [value, rows] of occurrencesMap.entries()) {
+      if (rows.length > 1) {
+        // The first row is the original, the rest are duplicates.
+        rows.slice(1).forEach(rowNum => allDuplicateRows.add(rowNum));
+        // Add stats for this value
+        statsMap.set(value, { count: rows.length, type });
+      }
+    }
+  };
+
+  processOccurrences(phoneOccurrences, 'Phone');
+  processOccurrences(emailOccurrences, 'Email');
+
+  // Pass 3: Identify which duplicate rows are unsubmitted
+  const unsubmittedDuplicateRows = new Set();
+  for (const rowNumber of allDuplicateRows) {
+    const recordUrl = data[rowNumber - 1][recordUrlColIdx] ? String(data[rowNumber - 1][recordUrlColIdx]).trim() : '';
+    if (!recordUrl) {
+      unsubmittedDuplicateRows.add(rowNumber);
+    }
+  }
+
+  // Final step: Sort stats and return
+  const sortedStats = Array.from(statsMap.entries())
+    .map(([value, { count, type }]) => ({ value, count, type }))
+    .sort((a, b) => b.count - a.count);
+
+  Logger.log(`Found ${allDuplicateRows.size} duplicate rows, ${unsubmittedDuplicateRows.size} of which are unsubmitted.`);
+  Logger.log(`Duplicate stats collected for ${sortedStats.length} unique values.`);
+
+  return { allDuplicateRows, unsubmittedDuplicateRows, duplicateStats: sortedStats };
+}
+
+
+/**
  * Process all rows (called from progress dialog)
  */
 function processAllRows() {
   const rowsToProcess = getRowsToProcess();
   const results = [];
   
+  // Find all duplicates in the sheet before processing
+  const { allDuplicateRows, unsubmittedDuplicateRows, duplicateStats } = findDuplicateRows();
+
   for (let i = 0; i < rowsToProcess.length; i++) {
     const row = rowsToProcess[i];
-    const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL');
-    results.push(result);
+
+    // Check if the current row is a duplicate
+    if (allDuplicateRows.has(row.rowNumber)) {
+      // If it's a duplicate, create a specific result and skip normal processing
+      results.push({
+        success: false,
+        rowNumber: row.rowNumber,
+        error: 'Duplicate phone or email',
+        isDuplicate: true // Custom flag for the UI
+      });
+    } else {
+      // If not a duplicate, process as usual
+      const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL');
+      results.push(result);
+    }
   }
   
   // Clean up stored data
   const properties = PropertiesService.getScriptProperties();
   properties.deleteProperty('ROWS_TO_PROCESS');
   
-  return results;
+  // Return a comprehensive object with results and duplicate info
+  return {
+    results: results,
+    unsubmittedDuplicateRows: Array.from(unsubmittedDuplicateRows),
+    duplicateStats: duplicateStats
+  };
 }
+
+/**
+ * Deletes specified rows from the active sheet.
+ * @param {number[]} rowNumbers An array of row numbers to delete.
+ * @returns {object} An object indicating success or failure.
+ */
+function deleteSheetRows(rowNumbers) {
+  if (!rowNumbers || !Array.isArray(rowNumbers) || rowNumbers.length === 0) {
+    return { success: false, error: "No row numbers provided." };
+  }
+
+  const sheet = SpreadsheetApp.getActiveSheet();
+  // Sort rows in descending order to avoid shifting issues
+  const sortedRowNumbers = rowNumbers.sort((a, b) => b - a);
+  let deletedCount = 0;
+
+  try {
+    for (const rowNumber of sortedRowNumbers) {
+      sheet.deleteRow(rowNumber);
+      deletedCount++;
+    }
+    Logger.log(`Successfully deleted ${deletedCount} rows.`);
+    return { success: true, deletedCount: deletedCount };
+  } catch (e) {
+    Logger.log(`Error deleting rows: ${e.message}`);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Shows the standalone dialog for finding and deleting duplicates.
+ * This is called from the custom menu.
+ */
+function showDuplicateDeletionDialog() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Step 1: Find all duplicates and get stats
+  const { unsubmittedDuplicateRows, duplicateStats } = findDuplicateRows();
+  const unsubmittedArray = Array.from(unsubmittedDuplicateRows);
+
+  // Step 2: Check if there's anything to do
+  if (unsubmittedArray.length === 0) {
+    ui.alert('No Unsubmitted Duplicates Found', 'The scan completed successfully and found no unsubmitted duplicate rows.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Step 3: Prepare data for the dialog
+  const dialogData = {
+    unsubmittedDuplicateRows: unsubmittedArray,
+    topStats: duplicateStats.slice(0, 3) // Get the top 3 stats
+  };
+
+  // Step 4: Show the dialog using the generic function
+  showDuplicateDialogWithData(dialogData);
+}
+
+/**
+ * Shows the duplicate deletion dialog with pre-fetched data.
+ * @param {object} dialogData The data to show in the dialog.
+ */
+function showDuplicateDialogWithData(dialogData) {
+  const template = HtmlService.createTemplateFromFile('duplicate_deletion_dialog');
+  template.data = JSON.stringify(dialogData);
+
+  const htmlOutput = template.evaluate()
+    .setWidth(450)
+    .setHeight(350);
+
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Find & Delete Duplicates');
+}
+
 
 /**
  * Show the progress dialog for batch processing
