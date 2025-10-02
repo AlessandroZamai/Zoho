@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Date Confirmation</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            background: #F4F4F7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4B286D 0%, #E53293 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 32px;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+
+        .alert strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4B286D;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #2B8000;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1F5C09;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #5f6368;
+        }
+
+        .btn-secondary:hover {
+            background: #e8eaed;
+        }
+
+        .btn:disabled {
+            background: #B3B9BE !important;
+            color: #FEFEFF !important;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4B286D;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #c62828;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Campaign Date Confirmation</h1>
+            <p>Confirm or update your campaign dates before processing</p>
+        </div>
+
+        <div class="content">
+            <div class="alert">
+                <strong>Notice:</strong> Your campaign dates are different from today's date. Please confirm or update the campaign dates before processing your leads.
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmStartDate">Campaign Start Date:</label>
+                <input type="date" id="confirmStartDate">
+                <div class="help-text">The date when your campaign begins</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmEndDate">Campaign End Date:</label>
+                <input type="date" id="confirmEndDate">
+                <div class="help-text">The date when your campaign ends</div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="loading" id="loadingState">
+                <div class="spinner"></div>
+                <p>Updating dates and processing leads...</p>
+            </div>
+
+            <div class="button-group" id="buttonGroup">
+                <button class="btn btn-secondary" onclick="cancelDateConfirmation()">Cancel</button>
+                <button class="btn btn-primary" onclick="updateAndContinue()" id="updateBtn">Update & Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the dialog when loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCurrentDates();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Listen for date changes to validate
+            document.getElementById('confirmStartDate').addEventListener('change', validateDates);
+            document.getElementById('confirmEndDate').addEventListener('change', validateDates);
+        }
+
+        function loadCurrentDates() {
+            // Load current configuration dates
+            google.script.run
+                .withSuccessHandler(onDatesLoaded)
+                .withFailureHandler(onError)
+                .getExistingConfiguration();
+        }
+
+        function onDatesLoaded(config) {
+            if (config && config.campaignStartDate) {
+                document.getElementById('confirmStartDate').value = config.campaignStartDate;
+            }
+            if (config && config.campaignEndDate) {
+                document.getElementById('confirmEndDate').value = config.campaignEndDate;
+            }
+            
+            // Validate initial dates
+            validateDates();
+        }
+
+        function validateDates() {
+            const startDate = document.getElementById('confirmStartDate').value;
+            const endDate = document.getElementById('confirmEndDate').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const updateBtn = document.getElementById('updateBtn');
+            
+            // Clear previous error
+            errorMessage.classList.remove('show');
+            updateBtn.disabled = false;
+            
+            if (!startDate || !endDate) {
+                showError('Please select both start and end dates.');
+                updateBtn.disabled = true;
+                return false;
+            }
+            
+            if (new Date(endDate) <= new Date(startDate)) {
+                showError('End date must be after start date.');
+                updateBtn.disabled = true;
+                return false;
+            }
+            
+            return true;
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+        }
+
+        function updateAndContinue() {
+            if (!validateDates()) {
+                return;
+            }
+            
+            const startDate = document.getElementById('confirmStartDate').value;
+            const endDate = document.getElementById('confirmEndDate').value;
+            
+            // Show loading state
+            showLoading();
+            
+            // Update dates and continue processing
+            google.script.run
+                .withSuccessHandler(onUpdateSuccess)
+                .withFailureHandler(onUpdateError)
+                .updateCampaignDatesAndContinue(startDate, endDate);
+        }
+
+        function onUpdateSuccess(result) {
+            if (result.success) {
+                // Close the dialog - processing will continue in the background
+                google.script.host.close();
+            } else {
+                hideLoading();
+                showError('Error updating dates: ' + result.message);
+            }
+        }
+
+        function onUpdateError(error) {
+            hideLoading();
+            showError('Error: ' + error.message);
+        }
+
+        function onError(error) {
+            console.error('Error loading dates:', error);
+            showError('Error loading current dates: ' + error.message);
+        }
+
+        function cancelDateConfirmation() {
+            google.script.host.close();
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').classList.add('active');
+            document.getElementById('buttonGroup').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').classList.remove('active');
+            document.getElementById('buttonGroup').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

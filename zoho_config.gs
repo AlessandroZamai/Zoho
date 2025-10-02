@@ -117,69 +117,6 @@ function showSetupWizard() {
   }
 }
 
-/**
- * Alternative setup function that works from any context
- * Use this when showSetupWizard() fails due to context issues
- */
-function setupFromConsole() {
-  try {
-    Logger.log('Starting console-based setup...');
-    
-    // Check current configuration
-    const configStatus = isConfigurationComplete();
-    const properties = PropertiesService.getScriptProperties();
-    
-    Logger.log('Current configuration status: ' + JSON.stringify(configStatus));
-    
-    if (configStatus.complete) {
-      Logger.log('Configuration is already complete. Use showSetupWizard() from a spreadsheet to modify settings.');
-      return { success: true, message: 'Configuration already complete' };
-    }
-    
-    // Check what's missing
-    const organizationType = properties.getProperty('ZOHO_ORGANIZATION_TYPE');
-    const currentMode = getCurrentProcessingMode();
-    
-    let instructions = 'Setup Instructions:\n\n';
-    
-    if (!organizationType) {
-      instructions += '1. No organization type set. Please run showSetupWizard() from your spreadsheet.\n';
-    } else {
-      instructions += `Organization Type: ${organizationType}\n`;
-      
-      if (organizationType === 'KI' || organizationType === 'RT') {
-        // Check required properties
-        const propCheck = checkRequiredProperties();
-        
-        if (!propCheck.allSet) {
-          instructions += '2. Missing required script properties. Run initializeMissingProperties() and then set values in Project Settings > Script Properties.\n';
-        } else {
-          instructions += '2. Required script properties are set.\n';
-        }
-      }
-      
-      if (!currentMode) {
-        instructions += '3. Processing mode not set. Complete setup using showSetupWizard() from spreadsheet.\n';
-      } else {
-        instructions += `3. Processing mode: ${currentMode}\n`;
-      }
-    }
-    
-    instructions += '\nRecommended actions:\n';
-    instructions += '- Run initializeMissingProperties() to create missing script properties\n';
-    instructions += '- Run checkRequiredProperties() to verify property status\n';
-    instructions += '- Open your spreadsheet and run showSetupWizard() to complete user setup\n';
-    instructions += '- Use the add-on interface for configuration\n';
-    
-    Logger.log(instructions);
-    
-    return { success: true, message: instructions };
-    
-  } catch (error) {
-    Logger.log('Error in console setup: ' + error.toString());
-    return { success: false, message: error.toString() };
-  }
-}
 
 /**
  * Initialize missing script properties with blank values
@@ -300,122 +237,612 @@ function getCurrentProcessingMode() {
 
 /**
  * Save complete configuration from the enhanced setup wizard
+ * REFACTORED VERSION - Uses modular architecture with rollback support
  */
 function saveCompleteConfiguration(config) {
-  Logger.log('Saving complete configuration: ' + JSON.stringify(config));
+  Logger.log('Starting configuration save process (refactored version)');
+  Logger.log('Configuration: ' + JSON.stringify(config));
+  
+  let backup = null;
   
   try {
+    // Step 1: Validate configuration
+    Logger.log('Step 1: Validating configuration...');
+    const validation = validateCompleteConfiguration(config);
+    
+    if (!validation.isValid) {
+      Logger.log('Validation failed: ' + validation.errors.join(', '));
+      return {
+        success: false,
+        message: 'Configuration validation failed:\n' + validation.errors.join('\n')
+      };
+    }
+    
+    if (validation.warnings.length > 0) {
+      Logger.log('Validation warnings: ' + validation.warnings.join(', '));
+    }
+    
+    // Step 2: Create backup before making changes
+    Logger.log('Step 2: Creating configuration backup...');
+    const backupResult = createConfigurationBackup();
+    if (backupResult.success) {
+      backup = backupResult.backup;
+    } else {
+      Logger.log('Warning: Could not create backup - proceeding without rollback capability');
+    }
+    
+    // Step 3: Get properties service instance
     const properties = PropertiesService.getScriptProperties();
     
-    // Save processing mode (force to MANUAL for now)
-    properties.setProperty(CONFIG_PROCESSING_MODE, 'MANUAL');
-    
-    // Save organization type
-    properties.setProperty(CONFIG_ORGANIZATION_TYPE, config.organizationType);
-    
-    // Save organization-specific settings
-    const orgSettings = ORG_SETTINGS[config.organizationType];
-    if (config.organizationType === 'DL') {
-      // Dealership - save user-provided credentials
-      if (!config.orgCode) {
-        throw new Error('Organization code is required for Dealers');
-      }
-      if (!config.authTokenName) {
-        throw new Error('Auth token name is required for Dealers');
-      }
-      if (!config.authTokenValue) {
-        throw new Error('Auth token value is required for Dealers');
-      }
-      
-      properties.setProperty(CONFIG_ORG_CODE, config.orgCode);
-      properties.setProperty(CONFIG_AUTH_TOKEN_NAME, config.authTokenName);
-      properties.setProperty(CONFIG_AUTH_TOKEN_VALUE, config.authTokenValue);
-    } else {
-      // Corporate Store or Mobile Klinik - use predefined settings
-      if (!orgSettings || !orgSettings.orgCode) {
-        throw new Error(`Organization settings not found for ${config.organizationType}`);
-      }
-      
-      properties.setProperty(CONFIG_ORG_CODE, orgSettings.orgCode);
-      
-      // Get predefined credentials from script properties
-      const authTokenName = properties.getProperty(orgSettings.authTokenNameKey);
-      const authTokenValue = properties.getProperty(orgSettings.authTokenValueKey);
-      
-      if (!authTokenName || !authTokenValue) {
-        const orgTypeName = config.organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik';
-        const missingTokens = [];
-        if (!authTokenName) missingTokens.push(orgSettings.authTokenNameKey);
-        if (!authTokenValue) missingTokens.push(orgSettings.authTokenValueKey);
-        
-        throw new Error(`${orgTypeName} credentials not configured. Missing: ${missingTokens.join(', ')}\n\nTo fix this:\n1. Go to Extensions > Apps Script\n2. Click Project Settings (gear icon)\n3. Scroll to Script Properties\n4. Add the missing properties with their values\n5. Save and try setup again\n\nIf you don't have these credentials, contact your TELUS administrator.`);
-      }
-      
-      properties.setProperty(CONFIG_AUTH_TOKEN_NAME, authTokenName);
-      properties.setProperty(CONFIG_AUTH_TOKEN_VALUE, authTokenValue);
+    // Step 4: Save processing mode (always MANUAL)
+    Logger.log('Step 3: Saving processing mode...');
+    const modeResult = saveProcessingModeConfig(properties);
+    if (!modeResult.success) {
+      throw new Error(modeResult.error);
     }
     
-    // Save campaign dates
-    properties.setProperty(CONFIG_CAMPAIGN_START_DATE, config.campaignStartDate);
-    properties.setProperty(CONFIG_CAMPAIGN_END_DATE, config.campaignEndDate);
-    
-    // Save lead assignment strategy
-    properties.setProperty(CONFIG_LEAD_ASSIGNMENT, config.leadAssignment);
-    
-    // Save selected fields with assignment field based on lead assignment strategy
-    if (config.selectedFields) {
-      let fieldsToSave = [...config.selectedFields];
-      
-      // Add store field if store assignment is selected
-      if (config.leadAssignment === 'Store') {
-        // Check if store field is not already included
-        const hasStoreField = fieldsToSave.some(field => field.apiName === 'ChannelOutletId');
-        if (!hasStoreField) {
-          fieldsToSave.push(STORE_ASSIGNMENT_FIELD);
-        }
-      }
-      
-      // Ensure AssignmentValue field is always included for all assignment types
-      const hasAssignmentField = fieldsToSave.some(field => field.apiName === 'AssignmentValue');
-      if (!hasAssignmentField) {
-        // Add the assignment field with appropriate display name based on assignment strategy
-        const assignmentDisplayName = getAssignmentColumnTitle(config.leadAssignment);
-        fieldsToSave.push({
-          apiName: 'AssignmentValue',
-          displayName: assignmentDisplayName,
-          required: config.leadAssignment !== 'ADMIN', // Not required for ADMIN assignment
-          validation: null
-        });
-      }
-      
-      properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(fieldsToSave));
+    // Step 5: Save organization configuration
+    Logger.log('Step 4: Saving organization configuration...');
+    const orgResult = saveOrganizationConfig(config, properties);
+    if (!orgResult.success) {
+      throw new Error(orgResult.error);
     }
     
-    // Save setup completion date
-    const today = new Date().toISOString().split('T')[0];
-    properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, today);
+    // Step 6: Save campaign configuration
+    Logger.log('Step 5: Saving campaign configuration...');
+    const campaignResult = saveCampaignConfig(config, properties);
+    if (!campaignResult.success) {
+      throw new Error(campaignResult.error);
+    }
     
-    // Remove old enabledColumns property if it exists
-    properties.deleteProperty('ZOHO_ENABLED_COLUMNS');
+    // Step 7: Save lead assignment configuration
+    Logger.log('Step 6: Saving lead assignment configuration...');
+    const assignmentResult = saveLeadAssignmentConfig(config, properties);
+    if (!assignmentResult.success) {
+      throw new Error(assignmentResult.error);
+    }
     
-    // Configure triggers and menu based on processing mode (always manual now)
-    const triggerResult = configureTriggers('MANUAL');
+    // Step 8: Prepare and save field selection
+    Logger.log('Step 7: Preparing field selection...');
+    const completeFieldList = prepareCompleteFieldList(
+      config.selectedFields,
+      config.leadAssignment
+    );
+    
+    Logger.log('Step 8: Saving field selection...');
+    const fieldsResult = saveFieldSelectionConfig(completeFieldList, properties);
+    if (!fieldsResult.success) {
+      throw new Error(fieldsResult.error);
+    }
+    
+    // Step 9: Save setup completion date
+    Logger.log('Step 9: Saving setup completion date...');
+    const completionResult = saveSetupCompletionDate(properties);
+    if (!completionResult.success) {
+      throw new Error(completionResult.error);
+    }
+    
+    // Step 10: Configure triggers
+    Logger.log('Step 10: Configuring triggers...');
+    const triggerResult = configureTriggersForMode();
     if (!triggerResult.success) {
-      throw new Error(triggerResult.message);
+      throw new Error(triggerResult.error);
     }
     
-    // Update the spreadsheet with selected fields
-    updateSpreadsheetWithSelectedFields();
+    // Step 11: Ensure system fields are present
+    Logger.log('Step 11: Ensuring system fields are present...');
+    const systemFieldsResult = ensureSystemFieldsPresent();
+    if (!systemFieldsResult.success) {
+      Logger.log('Warning: ' + systemFieldsResult.error);
+      // Don't fail the entire process for this
+    }
     
+    // Step 12: Update spreadsheet
+    Logger.log('Step 12: Updating spreadsheet...');
+    const spreadsheetResult = updateSpreadsheetWithFields(
+      systemFieldsResult.spreadsheetUpdated || false
+    );
+    if (!spreadsheetResult.success) {
+      Logger.log('Warning: ' + spreadsheetResult.error);
+      // Don't fail the entire process for this
+    }
+    
+    // Success!
     Logger.log('Configuration saved successfully');
-    return { 
-      success: true, 
-      message: `Configuration saved successfully! Your ${config.organizationType === 'DL' ? 'dealership' : (config.organizationType === 'KI' ? 'corporate store' : 'Mobile Klinik')} integration is now configured for manual processing.`
+    
+    const orgTypeName = config.organizationType === 'DL' 
+      ? 'dealership' 
+      : (config.organizationType === 'KI' ? 'corporate store' : 'Mobile Klinik');
+    
+    return {
+      success: true,
+      message: `Configuration saved successfully! Your ${orgTypeName} integration is now configured for manual processing.`
     };
     
   } catch (error) {
-    Logger.log('Error saving configuration: ' + error.toString());
-    return { success: false, message: 'Error saving configuration: ' + error.toString() };
+    Logger.log('Error during configuration save: ' + error.toString());
+    
+    // Attempt rollback if we have a backup
+    if (backup) {
+      Logger.log('Attempting to rollback configuration...');
+      const rollbackResult = restoreConfigurationBackup(backup);
+      
+      if (rollbackResult.success) {
+        Logger.log('Configuration successfully rolled back');
+        return {
+          success: false,
+          message: `Error saving configuration: ${error.message}\n\nConfiguration has been rolled back to previous state.`
+        };
+      } else {
+        Logger.log('Rollback failed: ' + rollbackResult.error);
+        return {
+          success: false,
+          message: `Error saving configuration: ${error.message}\n\nWARNING: Rollback failed. Configuration may be in an inconsistent state. Please run setup again.`
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      message: `Error saving configuration: ${error.message}`
+    };
+  }
+}
+
+// ============================================================================
+// REFACTORED HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Validates the complete configuration object before saving
+ */
+function validateCompleteConfiguration(config) {
+  const errors = [];
+  const warnings = [];
+  
+  // Validate organization type
+  if (!config.organizationType) {
+    errors.push('Organization type is required');
+  } else if (!['KI', 'RT', 'DL'].includes(config.organizationType)) {
+    errors.push(`Invalid organization type: ${config.organizationType}`);
+  }
+  
+  // Validate organization-specific settings
+  if (config.organizationType === 'DL') {
+    if (!config.orgCode || config.orgCode.trim() === '') {
+      errors.push('Organization code is required for Dealerships');
+    }
+    if (!config.authTokenName || config.authTokenName.trim() === '') {
+      errors.push('Auth token name is required for Dealerships');
+    }
+    if (!config.authTokenValue || config.authTokenValue.trim() === '') {
+      errors.push('Auth token value is required for Dealerships');
+    }
+  } else {
+    const orgSettings = ORG_SETTINGS[config.organizationType];
+    if (!orgSettings) {
+      errors.push(`Organization settings not found for ${config.organizationType}`);
+    } else if (!orgSettings.orgCode) {
+      errors.push(`Organization code not configured for ${config.organizationType}`);
+    }
+  }
+  
+  // Validate campaign dates
+  if (!config.campaignStartDate) {
+    errors.push('Campaign start date is required');
+  } else {
+    const startDate = new Date(config.campaignStartDate);
+    if (isNaN(startDate.getTime())) {
+      errors.push('Invalid campaign start date format');
+    }
+  }
+  
+  if (!config.campaignEndDate) {
+    errors.push('Campaign end date is required');
+  } else {
+    const endDate = new Date(config.campaignEndDate);
+    if (isNaN(endDate.getTime())) {
+      errors.push('Invalid campaign end date format');
+    }
+    
+    if (config.campaignStartDate) {
+      const startDate = new Date(config.campaignStartDate);
+      if (!isNaN(startDate.getTime()) && endDate <= startDate) {
+        errors.push('Campaign end date must be after start date');
+      }
+    }
+  }
+  
+  // Validate lead assignment
+  if (!config.leadAssignment) {
+    errors.push('Lead assignment strategy is required');
+  } else if (!['Store', 'Sales_Rep', 'ADMIN'].includes(config.leadAssignment)) {
+    errors.push(`Invalid lead assignment strategy: ${config.leadAssignment}`);
+  }
+  
+  // Validate selected fields if provided
+  if (config.selectedFields) {
+    if (!Array.isArray(config.selectedFields)) {
+      errors.push('Selected fields must be an array');
+    } else if (config.selectedFields.length === 0) {
+      warnings.push('No fields selected - default fields will be used');
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors,
+    warnings: warnings
+  };
+}
+
+/**
+ * Validates that required script properties exist for KI/RT organizations
+ */
+function validatePredefinedCredentials(organizationType) {
+  const properties = PropertiesService.getScriptProperties();
+  const orgSettings = ORG_SETTINGS[organizationType];
+  
+  if (!orgSettings) {
+    return {
+      isValid: false,
+      error: `Organization settings not found for ${organizationType}`
+    };
+  }
+  
+  const authTokenName = properties.getProperty(orgSettings.authTokenNameKey);
+  const authTokenValue = properties.getProperty(orgSettings.authTokenValueKey);
+  
+  const missingTokens = [];
+  if (!authTokenName) missingTokens.push(orgSettings.authTokenNameKey);
+  if (!authTokenValue) missingTokens.push(orgSettings.authTokenValueKey);
+  
+  if (missingTokens.length > 0) {
+    const orgTypeName = organizationType === 'KI' ? 'Corporate Store' : 'Mobile Klinik';
+    const errorMessage = `${orgTypeName} credentials not configured.\n\n` +
+      `Missing properties: ${missingTokens.join(', ')}\n\n` +
+      `To fix this:\n` +
+      `1. Go to Extensions > Apps Script\n` +
+      `2. Click Project Settings (gear icon)\n` +
+      `3. Scroll to Script Properties\n` +
+      `4. Add the missing properties with their values\n` +
+      `5. Save and try setup again\n\n` +
+      `If you don't have these credentials, contact your TELUS administrator.`;
+    
+    return {
+      isValid: false,
+      error: errorMessage
+    };
+  }
+  
+  return {
+    isValid: true,
+    authTokenName: authTokenName,
+    authTokenValue: authTokenValue,
+    orgCode: orgSettings.orgCode
+  };
+}
+
+/**
+ * Prepares the complete field list including user-selected, hidden, and system fields
+ */
+function prepareCompleteFieldList(userSelectedFields, leadAssignment) {
+  const fieldMap = new Map();
+  
+  if (userSelectedFields && Array.isArray(userSelectedFields)) {
+    userSelectedFields.forEach(field => {
+      fieldMap.set(field.apiName, field);
+    });
+  }
+  
+  HIDDEN_FIELDS.forEach(field => {
+    fieldMap.set(field.apiName, field);
+  });
+  
+  SYSTEM_FIELDS.forEach(field => {
+    fieldMap.set(field.apiName, field);
+  });
+  
+  let allFields = Array.from(fieldMap.values());
+  allFields = updateAssignmentField(allFields, leadAssignment);
+  
+  return ensureSystemFieldsAreLast(allFields);
+}
+
+/**
+ * Updates the AssignmentValue field based on lead assignment strategy
+ */
+function updateAssignmentField(fields, leadAssignment) {
+  let updatedFields = fields.filter(field => field.apiName !== 'ChannelOutletId');
+  
+  const assignmentFieldIndex = updatedFields.findIndex(field => field.apiName === 'AssignmentValue');
+  const assignmentDisplayName = getAssignmentColumnTitle(leadAssignment);
+  
+  const assignmentField = {
+    apiName: 'AssignmentValue',
+    displayName: assignmentDisplayName,
+    required: leadAssignment !== 'ADMIN',
+    validation: null
+  };
+  
+  if (assignmentFieldIndex >= 0) {
+    updatedFields[assignmentFieldIndex] = assignmentField;
+  } else {
+    updatedFields.push(assignmentField);
+  }
+  
+  return updatedFields;
+}
+
+/**
+ * Saves organization-specific configuration
+ */
+function saveOrganizationConfig(config, properties) {
+  try {
+    properties.setProperty(CONFIG_ORGANIZATION_TYPE, config.organizationType);
+    
+    let authTokenName, authTokenValue, orgCode;
+    
+    if (config.organizationType === 'DL') {
+      authTokenName = config.authTokenName;
+      authTokenValue = config.authTokenValue;
+      orgCode = config.orgCode;
+    } else {
+      const credentialsValidation = validatePredefinedCredentials(config.organizationType);
+      if (!credentialsValidation.isValid) {
+        return {
+          success: false,
+          error: credentialsValidation.error
+        };
+      }
+      
+      authTokenName = credentialsValidation.authTokenName;
+      authTokenValue = credentialsValidation.authTokenValue;
+      orgCode = credentialsValidation.orgCode;
+    }
+    
+    properties.setProperty(CONFIG_ORG_CODE, orgCode);
+    properties.setProperty(CONFIG_AUTH_TOKEN_NAME, authTokenName);
+    properties.setProperty(CONFIG_AUTH_TOKEN_VALUE, authTokenValue);
+    
+    return {
+      success: true,
+      credentials: {
+        authTokenName: authTokenName,
+        authTokenValue: authTokenValue,
+        orgCode: orgCode
+      }
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save organization config: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Saves campaign configuration
+ */
+function saveCampaignConfig(config, properties) {
+  try {
+    properties.setProperty(CONFIG_CAMPAIGN_START_DATE, config.campaignStartDate);
+    properties.setProperty(CONFIG_CAMPAIGN_END_DATE, config.campaignEndDate);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save campaign config: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Saves lead assignment configuration
+ */
+function saveLeadAssignmentConfig(config, properties) {
+  try {
+    properties.setProperty(CONFIG_LEAD_ASSIGNMENT, config.leadAssignment);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save lead assignment config: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Saves field selection configuration
+ */
+function saveFieldSelectionConfig(completeFieldList, properties) {
+  try {
+    properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(completeFieldList));
+    properties.deleteProperty('ZOHO_ENABLED_COLUMNS');
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save field selection: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Saves processing mode configuration (always MANUAL for now)
+ */
+function saveProcessingModeConfig(properties) {
+  try {
+    properties.setProperty(CONFIG_PROCESSING_MODE, 'MANUAL');
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save processing mode: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Saves setup completion timestamp
+ */
+function saveSetupCompletionDate(properties) {
+  try {
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, today);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to save completion date: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Configures triggers based on processing mode
+ */
+function configureTriggersForMode() {
+  try {
+    const triggerResult = configureTriggers('MANUAL');
+    if (!triggerResult.success) {
+      return {
+        success: false,
+        error: triggerResult.message
+      };
+    }
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to configure triggers: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Ensures system fields are present and fixes if needed
+ */
+function ensureSystemFieldsPresent() {
+  try {
+    const systemFieldsCheck = checkSystemFields();
+    
+    if (systemFieldsCheck.missing) {
+      Logger.log('System fields missing during setup completion, auto-fixing...');
+      const fixResult = fixSystemFields();
+      
+      if (!fixResult.success) {
+        Logger.log('Warning: Could not auto-fix system fields: ' + fixResult.message);
+        return {
+          success: false,
+          error: fixResult.message,
+          spreadsheetUpdated: false
+        };
+      }
+      
+      Logger.log('System fields auto-fixed during setup completion');
+      return {
+        success: true,
+        spreadsheetUpdated: fixResult.spreadsheetUpdated
+      };
+    }
+    
+    return {
+      success: true,
+      spreadsheetUpdated: false
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to ensure system fields: ${error.message}`,
+      spreadsheetUpdated: false
+    };
+  }
+}
+
+/**
+ * Updates the spreadsheet with selected fields
+ */
+function updateSpreadsheetWithFields(spreadsheetAlreadyUpdated) {
+  try {
+    if (!spreadsheetAlreadyUpdated) {
+      updateSpreadsheetWithSelectedFields();
+      Logger.log('Spreadsheet updated with selected fields during setup completion');
+      return { success: true };
+    } else {
+      Logger.log('Spreadsheet update skipped - already updated by fixSystemFields');
+      return { success: true, skipped: true };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to update spreadsheet: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Creates a backup of current configuration before making changes
+ */
+function createConfigurationBackup() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    
+    const backup = {
+      processingMode: properties.getProperty(CONFIG_PROCESSING_MODE),
+      organizationType: properties.getProperty(CONFIG_ORGANIZATION_TYPE),
+      orgCode: properties.getProperty(CONFIG_ORG_CODE),
+      authTokenName: properties.getProperty(CONFIG_AUTH_TOKEN_NAME),
+      authTokenValue: properties.getProperty(CONFIG_AUTH_TOKEN_VALUE),
+      campaignStartDate: properties.getProperty(CONFIG_CAMPAIGN_START_DATE),
+      campaignEndDate: properties.getProperty(CONFIG_CAMPAIGN_END_DATE),
+      leadAssignment: properties.getProperty(CONFIG_LEAD_ASSIGNMENT),
+      selectedFields: properties.getProperty(CONFIG_SELECTED_FIELDS),
+      setupCompletionDate: properties.getProperty(CONFIG_SETUP_COMPLETION_DATE),
+      timestamp: new Date().toISOString()
+    };
+    
+    Logger.log('Configuration backup created at ' + backup.timestamp);
+    return { success: true, backup: backup };
+    
+  } catch (error) {
+    Logger.log('Failed to create configuration backup: ' + error.message);
+    return {
+      success: false,
+      error: `Failed to create backup: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Restores configuration from a backup
+ */
+function restoreConfigurationBackup(backup) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    
+    if (backup.processingMode) properties.setProperty(CONFIG_PROCESSING_MODE, backup.processingMode);
+    if (backup.organizationType) properties.setProperty(CONFIG_ORGANIZATION_TYPE, backup.organizationType);
+    if (backup.orgCode) properties.setProperty(CONFIG_ORG_CODE, backup.orgCode);
+    if (backup.authTokenName) properties.setProperty(CONFIG_AUTH_TOKEN_NAME, backup.authTokenName);
+    if (backup.authTokenValue) properties.setProperty(CONFIG_AUTH_TOKEN_VALUE, backup.authTokenValue);
+    if (backup.campaignStartDate) properties.setProperty(CONFIG_CAMPAIGN_START_DATE, backup.campaignStartDate);
+    if (backup.campaignEndDate) properties.setProperty(CONFIG_CAMPAIGN_END_DATE, backup.campaignEndDate);
+    if (backup.leadAssignment) properties.setProperty(CONFIG_LEAD_ASSIGNMENT, backup.leadAssignment);
+    if (backup.selectedFields) properties.setProperty(CONFIG_SELECTED_FIELDS, backup.selectedFields);
+    if (backup.setupCompletionDate) properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, backup.setupCompletionDate);
+    
+    Logger.log('Configuration restored from backup created at ' + backup.timestamp);
+    return { success: true };
+    
+  } catch (error) {
+    Logger.log('Failed to restore configuration backup: ' + error.message);
+    return {
+      success: false,
+      error: `Failed to restore backup: ${error.message}`
+    };
   }
 }
 
@@ -481,16 +908,6 @@ function getExistingConfiguration() {
 }
 
 /**
- * Get setup completion date to determine if this is first-time setup
- */
-function getSetupCompletionDate() {
-  const properties = PropertiesService.getScriptProperties();
-  return {
-    setupCompletionDate: properties.getProperty(CONFIG_SETUP_COMPLETION_DATE)
-  };
-}
-
-/**
  * Get configuration values for use in webhook functions
  */
 function getConfigurationValues() {
@@ -540,159 +957,159 @@ function getAssignmentColumnTitle(leadAssignment) {
 }
 
 /**
- * Get expected headers with dynamic assignment column
- */
-function getExpectedHeaders() {
-  const properties = PropertiesService.getScriptProperties();
-  const leadAssignment = properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep';
-  const assignmentTitle = getAssignmentColumnTitle(leadAssignment);
-  
-  return [
-    'First Name', 'Last Name', 'Phone', 'Email', 'Preferred Language', 
-    'Campaign Name', 'Description', 'Street', 'City', 
-    'Province', 'Postal Code', 'Country', 'Rate Plan', 'Device Model', 
-    'Current Provider', assignmentTitle,
-    'Zoho_Record_URL', 'Time_Created_in_Zoho'
-  ];
-}
-
-/**
- * Update spreadsheet template with new columns and formatting (legacy function)
- */
-function updateSpreadsheetTemplate() {
-  try {
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const properties = PropertiesService.getScriptProperties();
-    const leadAssignment = properties.getProperty(CONFIG_LEAD_ASSIGNMENT) || 'Sales_Rep';
-    
-    // Get expected headers with dynamic assignment column
-    const expectedHeaders = getExpectedHeaders();
-    
-    // Update header row if needed
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Check if we need to update headers
-    let needsUpdate = false;
-    if (headers.length !== expectedHeaders.length) {
-      needsUpdate = true;
-    } else {
-      for (let i = 0; i < expectedHeaders.length; i++) {
-        if (headers[i] !== expectedHeaders[i]) {
-          needsUpdate = true;
-          break;
-        }
-      }
-    }
-    
-    // Update headers if needed
-    if (needsUpdate) {
-      const headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
-      headerRange.setValues([expectedHeaders]);
-      
-      // Format header row
-      headerRange.setFontWeight('bold');
-      headerRange.setBackground('#e8f0fe');
-      headerRange.setBorder(true, true, true, true, true, true);
-    }
-    
-    // Apply column formatting for assignment column using dynamic mapping
-    const lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      try {
-        const assignmentColumn = getColumnIndexByApiName('AssignmentValue') + 1; // Convert to 1-based index
-        const assignmentRange = sheet.getRange(2, assignmentColumn, lastRow - 1, 1);
-        
-        if (leadAssignment === 'ADMIN') {
-          // Admin assignment - disable the column since no input needed
-          assignmentRange.setBackground('#f5f5f5');
-          assignmentRange.setFontColor('#9aa0a6');
-          assignmentRange.protect().setDescription('Admin assignment - no input required');
-        } else {
-          // Store or Sales Rep assignment - enable the column
-          assignmentRange.setBackground('#ffffff');
-          assignmentRange.setFontColor('#000000');
-          const description = leadAssignment === 'Store' ? 
-            'Store assignment - enter Channel Outlet ID' : 
-            'Sales Rep assignment - enter sales rep email';
-          assignmentRange.protect().setDescription(description);
-        }
-      } catch (error) {
-        Logger.log('Warning: Could not format assignment column - ' + error.toString());
-      }
-    }
-    
-    Logger.log('Spreadsheet template updated successfully with dynamic assignment column');
-    
-  } catch (error) {
-    Logger.log('Error updating spreadsheet template: ' + error.toString());
-  }
-}
-
-/**
  * Update spreadsheet with user-selected fields
  */
 function updateSpreadsheetWithSelectedFields() {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
-    const selectedFields = getSelectedFields();
+    const visibleFields = getVisibleFields(); // Use visible fields for spreadsheet headers
+    const newHeaders = visibleFields.map(field => field.displayName);
     
-    // Check if there's existing data and warn user
-    const lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      const ui = SpreadsheetApp.getUi();
-      const response = ui.alert(
-        'Clear Existing Data?',
-        'Changing field selections will clear all existing data in the sheet.\n\nDo you want to continue?',
-        ui.ButtonSet.YES_NO
-      );
-      
-      if (response !== ui.Button.YES) {
-        throw new Error('Field update cancelled by user');
-      }
-      
-      // Clear all data except header row
+    // Get current headers to compare
+    const currentLastColumn = sheet.getLastColumn();
+    let currentHeaders = [];
+    if (currentLastColumn > 0) {
+      currentHeaders = sheet.getRange(1, 1, 1, currentLastColumn).getValues()[0];
+    }
+    
+    // Check if headers have changed
+    const headersChanged = !arraysEqual(currentHeaders, newHeaders);
+    
+    if (headersChanged) {
+      // Check if there's existing data and warn user
+      const lastRow = sheet.getLastRow();
       if (lastRow > 1) {
-        sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clear();
+        const ui = SpreadsheetApp.getUi();
+        const response = ui.alert(
+          'Field Configuration Changed',
+          'Your field selection has changed, which will require restructuring the spreadsheet.\n\n' +
+          'This will:\n' +
+          '• Remove old columns that are no longer selected\n' +
+          '• Add new columns for newly selected fields\n' +
+          '• Clear all existing data to prevent misalignment\n\n' +
+          'Do you want to continue?',
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (response !== ui.Button.YES) {
+          throw new Error('Field update cancelled by user');
+        }
       }
+      
+      // Perform complete sheet restructuring
+      restructureSpreadsheet(visibleFields, newHeaders);
+    } else {
+      // Headers haven't changed, just refresh formatting and validation
+      refreshSpreadsheetFormatting(visibleFields);
     }
     
-    // Create headers from selected fields
-    const headers = selectedFields.map(field => field.displayName);
-    
-    // Clear existing content, data validation, conditional formatting, and notes
-    sheet.clear();
-    // Clear data validation from the entire sheet (not just data range)
-    const maxRows = sheet.getMaxRows();
-    const maxCols = sheet.getMaxColumns();
-    if (maxRows > 0 && maxCols > 0) {
-      const entireSheet = sheet.getRange(1, 1, maxRows, maxCols);
-      entireSheet.clearDataValidations();
-      // Clear all notes from the entire sheet
-      entireSheet.clearNote();
-    }
-    sheet.clearConditionalFormatRules();
-    
-    // Set new headers
-    const headerRange = sheet.getRange(1, 1, 1, headers.length);
-    headerRange.setValues([headers]);
-    
-    // Format header row
-    headerRange.setFontWeight('bold');
-    headerRange.setBackground('#e8f0fe');
-    headerRange.setBorder(true, true, true, true, true, true);
-    
-    // Highlight required columns
-    highlightRequiredColumns(selectedFields);
-    
-    // Apply data validation to fields that need it
-    applyDataValidationToSheet();
-    
-    Logger.log('Spreadsheet updated with selected fields: ' + headers.join(', '));
+    Logger.log('Spreadsheet updated with selected fields: ' + newHeaders.join(', '));
     
   } catch (error) {
     Logger.log('Error updating spreadsheet with selected fields: ' + error.toString());
     throw error;
   }
+}
+
+/**
+ * Completely restructure the spreadsheet with new field configuration
+ */
+function restructureSpreadsheet(selectedFields, newHeaders) {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  
+  // Clear everything - complete reset
+  sheet.clear();
+  
+  // Clear data validation from the entire sheet
+  const maxRows = sheet.getMaxRows();
+  const maxCols = sheet.getMaxColumns();
+  if (maxRows > 0 && maxCols > 0) {
+    const entireSheet = sheet.getRange(1, 1, maxRows, maxCols);
+    entireSheet.clearDataValidations();
+    entireSheet.clearNote();
+  }
+  
+  // Clear conditional formatting
+  sheet.clearConditionalFormatRules();
+  
+  // Remove extra columns if the new field count is less than current columns
+  const currentColumnCount = sheet.getMaxColumns();
+  const newColumnCount = newHeaders.length;
+  
+  if (currentColumnCount > newColumnCount) {
+    // Delete extra columns
+    const columnsToDelete = currentColumnCount - newColumnCount;
+    for (let i = 0; i < columnsToDelete; i++) {
+      sheet.deleteColumn(newColumnCount + 1); // Always delete the column after our new range
+    }
+  }
+  
+  // Set new headers
+  const headerRange = sheet.getRange(1, 1, 1, newHeaders.length);
+  headerRange.setValues([newHeaders]);
+  
+  // Format header row
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#e8f0fe');
+  headerRange.setBorder(true, true, true, true, true, true);
+  
+  // Apply field-specific formatting
+  applyFieldFormatting(selectedFields);
+  
+  Logger.log('Spreadsheet completely restructured with ' + newHeaders.length + ' columns');
+}
+
+/**
+ * Refresh spreadsheet formatting without restructuring
+ */
+function refreshSpreadsheetFormatting(selectedFields) {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  
+  // Clear existing conditional formatting and data validation
+  sheet.clearConditionalFormatRules();
+  
+  const maxRows = sheet.getMaxRows();
+  const maxCols = sheet.getMaxColumns();
+  if (maxRows > 0 && maxCols > 0) {
+    const entireSheet = sheet.getRange(1, 1, maxRows, maxCols);
+    entireSheet.clearDataValidations();
+    entireSheet.clearNote();
+  }
+  
+  // Reapply field-specific formatting
+  applyFieldFormatting(selectedFields);
+  
+  Logger.log('Spreadsheet formatting refreshed');
+}
+
+/**
+ * Apply field-specific formatting including highlighting, validation, and notes
+ */
+function applyFieldFormatting(selectedFields) {
+  // Highlight required columns and apply special formatting
+  highlightRequiredColumns(selectedFields);
+  
+  // Apply data validation to fields that need it
+  applyDataValidationToSheet();
+  
+  Logger.log('Field-specific formatting applied');
+}
+
+/**
+ * Check if two arrays are equal
+ */
+function arraysEqual(arr1, arr2) {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+  
+  for (let i = 0; i < arr1.length; i++) {
+    if (arr1[i] !== arr2[i]) {
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 /**
@@ -770,7 +1187,7 @@ function highlightRequiredColumns(selectedFields) {
         } else {
           // Store or Sales Rep assignment - normal formatting
           if (leadAssignment === 'Store') {
-            headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 11-digit ChannelOutletID (store long-code)');
+            headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 10-digit ChannelOutletID (store long-code)');
           } else {
             headerCell.setNote('👤 SALES REP ASSIGNMENT - Enter the sales rep email address');
           }
@@ -783,7 +1200,7 @@ function highlightRequiredColumns(selectedFields) {
         const headerCell = sheet.getRange(1, columnIndex);
         
         // Add clarifying note for store field
-        headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 11-digit ChannelOutletID (store long-code)');
+        headerCell.setNote('📍 STORE ASSIGNMENT - Enter the 10-digit ChannelOutletID (store long-code)');
         
         Logger.log(`Added note to store assignment column: ${field.displayName} (column ${columnIndex})`);
       }
@@ -932,17 +1349,245 @@ function saveSelectedFields(selectedFields) {
   try {
     const properties = PropertiesService.getScriptProperties();
     
-    // Add hidden fields and system fields to the selection
-    const allSelectedFields = [...selectedFields, ...HIDDEN_FIELDS, ...SYSTEM_FIELDS];
+    // Ensure we have the required imports
+    if (typeof HIDDEN_FIELDS === 'undefined' || typeof SYSTEM_FIELDS === 'undefined') {
+      throw new Error('Required field constants not available');
+    }
     
-    properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(allSelectedFields));
+    // Create a map of existing fields to avoid duplicates
+    const fieldMap = new Map();
     
-    Logger.log('Selected fields saved: ' + allSelectedFields.map(f => f.displayName).join(', '));
+    // Add user-selected fields first
+    selectedFields.forEach(field => {
+      fieldMap.set(field.apiName, field);
+    });
     
-    return { success: true, message: 'Selected fields saved successfully' };
+    // Add hidden fields (overwrite if duplicate)
+    HIDDEN_FIELDS.forEach(field => {
+      fieldMap.set(field.apiName, field);
+    });
+    
+    // Add system fields (overwrite if duplicate)
+    SYSTEM_FIELDS.forEach(field => {
+      fieldMap.set(field.apiName, field);
+    });
+    
+    // Convert back to array
+    const allSelectedFields = Array.from(fieldMap.values());
+    
+    // Ensure proper ordering with Zoho_Record_URL and Time_Created_in_Zoho as last two columns
+    const orderedFields = ensureSystemFieldsAreLast(allSelectedFields);
+    
+    properties.setProperty(CONFIG_SELECTED_FIELDS, JSON.stringify(orderedFields));
+    
+    Logger.log('Selected fields saved with proper ordering: ' + orderedFields.map(f => f.displayName).join(', '));
+    Logger.log('System fields positioned as last two columns: Zoho_Record_URL, Time_Created_in_Zoho');
+    
+    return { success: true, message: 'Selected fields saved successfully with proper column ordering' };
     
   } catch (error) {
     Logger.log('Error saving selected fields: ' + error.toString());
     return { success: false, message: error.toString() };
+  }
+}
+
+/**
+ * Fix missing system fields in the current configuration
+ * This function ensures Zoho_Record_URL and Time_Created_in_Zoho are always present
+ */
+function fixSystemFields() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const currentFieldsJson = properties.getProperty('ZOHO_SELECTED_FIELDS');
+    
+    let currentFields = [];
+    if (currentFieldsJson) {
+      try {
+        currentFields = JSON.parse(currentFieldsJson);
+      } catch (error) {
+        Logger.log('Error parsing current fields, using default fields: ' + error.toString());
+        currentFields = getDefaultFields();
+      }
+    } else {
+      Logger.log('No field configuration found, using default fields');
+      currentFields = getDefaultFields();
+    }
+    
+    Logger.log('Current fields before fix: ' + currentFields.map(f => f.displayName).join(', '));
+    
+    // Create a map of existing fields by API name for easy lookup
+    const existingFieldsMap = new Map();
+    currentFields.forEach(field => {
+      existingFieldsMap.set(field.apiName, field);
+    });
+    
+    // Ensure all system fields are present
+    let fieldsAdded = false;
+    SYSTEM_FIELDS.forEach(systemField => {
+      if (!existingFieldsMap.has(systemField.apiName)) {
+        Logger.log('Adding missing system field: ' + systemField.displayName);
+        currentFields.push(systemField);
+        existingFieldsMap.set(systemField.apiName, systemField);
+        fieldsAdded = true;
+      }
+    });
+    
+    // Ensure all hidden fields are present
+    HIDDEN_FIELDS.forEach(hiddenField => {
+      if (!existingFieldsMap.has(hiddenField.apiName)) {
+        Logger.log('Adding missing hidden field: ' + hiddenField.displayName);
+        currentFields.push(hiddenField);
+        existingFieldsMap.set(hiddenField.apiName, hiddenField);
+        fieldsAdded = true;
+      }
+    });
+    
+    let spreadsheetUpdated = false;
+    
+    if (fieldsAdded) {
+      // Ensure proper ordering with system fields last before saving
+      const orderedFields = ensureSystemFieldsAreLast(currentFields);
+      
+      // Save the updated field configuration with proper ordering
+      properties.setProperty('ZOHO_SELECTED_FIELDS', JSON.stringify(orderedFields));
+      
+      Logger.log('Fixed fields: ' + currentFields.map(f => f.displayName).join(', '));
+      
+      // Update the spreadsheet with the new field configuration
+      try {
+        updateSpreadsheetWithSelectedFields();
+        spreadsheetUpdated = true;
+        Logger.log('Spreadsheet updated with fixed field configuration');
+      } catch (updateError) {
+        Logger.log('Warning: Could not update spreadsheet: ' + updateError.toString());
+      }
+      
+      return { 
+        success: true, 
+        message: 'System fields have been added to your configuration. The spreadsheet has been updated with the missing columns.',
+        fieldsAdded: true,
+        spreadsheetUpdated: spreadsheetUpdated
+      };
+    } else {
+      Logger.log('All system fields are already present');
+      return { 
+        success: true, 
+        message: 'All system fields are already present in the configuration.',
+        fieldsAdded: false,
+        spreadsheetUpdated: false
+      };
+    }
+    
+  } catch (error) {
+    Logger.log('Error fixing system fields: ' + error.toString());
+    return { 
+      success: false, 
+      message: 'Error fixing system fields: ' + error.toString(),
+      fieldsAdded: false,
+      spreadsheetUpdated: false
+    };
+  }
+}
+
+/**
+ * Check if system fields are missing from the current configuration
+ */
+function checkSystemFields() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const currentFieldsJson = properties.getProperty('ZOHO_SELECTED_FIELDS');
+    
+    if (!currentFieldsJson) {
+      return { 
+        missing: true, 
+        message: 'No field configuration found',
+        missingFields: SYSTEM_FIELDS.map(f => f.displayName)
+      };
+    }
+    
+    const currentFields = JSON.parse(currentFieldsJson);
+    const existingFieldsMap = new Map();
+    currentFields.forEach(field => {
+      existingFieldsMap.set(field.apiName, field);
+    });
+    
+    const missingSystemFields = [];
+    SYSTEM_FIELDS.forEach(systemField => {
+      if (!existingFieldsMap.has(systemField.apiName)) {
+        missingSystemFields.push(systemField.displayName);
+      }
+    });
+    
+    const missingHiddenFields = [];
+    HIDDEN_FIELDS.forEach(hiddenField => {
+      if (!existingFieldsMap.has(hiddenField.apiName)) {
+        missingHiddenFields.push(hiddenField.displayName);
+      }
+    });
+    
+    const allMissingFields = [...missingSystemFields, ...missingHiddenFields];
+    
+    if (allMissingFields.length > 0) {
+      return { 
+        missing: true, 
+        message: `Missing ${allMissingFields.length} system/hidden fields`,
+        missingFields: allMissingFields
+      };
+    } else {
+      return { 
+        missing: false, 
+        message: 'All system fields are present',
+        missingFields: []
+      };
+    }
+    
+  } catch (error) {
+    Logger.log('Error checking system fields: ' + error.toString());
+    return { 
+      missing: true, 
+      message: 'Error checking system fields: ' + error.toString(),
+      missingFields: []
+    };
+  }
+}
+
+/**
+ * Show system fields status dialog
+ */
+function showSystemFieldsStatus() {
+  try {
+    const status = checkSystemFields();
+    const ui = SpreadsheetApp.getUi();
+    
+    if (status.missing) {
+      const response = ui.alert(
+        'Missing System Fields',
+        `Your configuration is missing required system fields:\n\n${status.missingFields.join('\n')}\n\nThese fields are required for:\n• Tracking submission status\n• Duplicate detection\n• Record URL storage\n\nWould you like to fix this automatically?`,
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (response === ui.Button.YES) {
+        const fixResult = fixSystemFields();
+        ui.alert(
+          fixResult.success ? 'System Fields Fixed' : 'Fix Failed',
+          fixResult.message,
+          ui.ButtonSet.OK
+        );
+      }
+    } else {
+      ui.alert(
+        'System Fields Status',
+        'All required system fields are present in your configuration.',
+        ui.ButtonSet.OK
+      );
+    }
+    
+  } catch (error) {
+    Logger.log('Error showing system fields status: ' + error.toString());
+    SpreadsheetApp.getUi().alert(
+      'Error',
+      'Failed to check system fields status: ' + error.toString(),
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   }
 }

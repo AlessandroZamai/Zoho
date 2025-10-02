@@ -87,10 +87,14 @@ function sendUnsubmittedRowsToZoho() {
   }
   
   try {
-    // Check if dates need confirmation
-    const today = new Date().toISOString().split('T')[0];
+    // Check if setup completion date differs from today (for manual processing date tracking)
+    const properties = PropertiesService.getScriptProperties();
+    const setupDate = properties.getProperty(CONFIG_SETUP_COMPLETION_DATE);
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     
-    if (config.campaignStartDate && config.campaignStartDate !== today) {
+    // Only show date confirmation if setup was completed on a different day
+    // This allows users to set future campaign dates without being prompted every time
+    if (setupDate && setupDate !== today) {
       // Show date confirmation modal
       showDateConfirmationDialog();
       return; // Exit here, the dialog will continue the process
@@ -142,9 +146,7 @@ function continueWithProcessing() {
 /**
  * Unified function to process a single row (used by both auto and manual modes)
  */
-function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
-  Logger.log('Processing row ' + rowNumber + ' in ' + mode + ' mode');
-  
+function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL', cachedData = null) {
   try {
     // Validate the row first
     const validation = validateRowDataUnified(rowData, rowNumber);
@@ -158,8 +160,11 @@ function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
       };
     }
     
-    // Build payload
-    const payload = buildZohoPayload(rowData);
+    // Build payload using cached data if available
+    const payload = cachedData ? 
+      buildZohoPayloadOptimized(rowData, cachedData) : 
+      buildZohoPayload(rowData);
+    
     if (!payload) {
       return {
         success: false,
@@ -169,7 +174,7 @@ function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
     }
     
     // Send to webhook
-    const apiResult = sendToZohoAPI(payload);
+    const apiResult = sendToZohoAPI(payload, mode === 'MANUAL');
     if (!apiResult.success) {
       return {
         success: false,
@@ -179,21 +184,19 @@ function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
       };
     }
     
-    // Update spreadsheet
-    const updateResult = updateSpreadsheetWithResult(rowNumber, apiResult.recordId);
-    if (!updateResult.success) {
-      Logger.log('Warning: Failed to update spreadsheet: ' + updateResult.error);
-    }
-    
     return {
       success: true,
       rowNumber: rowNumber,
       recordId: apiResult.recordId,
-      validationWarnings: validation.warnings
+      validationWarnings: validation.warnings,
+      updateData: {
+        recordUrl: buildZohoRecordUrl(apiResult.recordId),
+        timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
+      }
     };
     
   } catch (error) {
-    Logger.log('Error processing row ' + rowNumber + ': ' + error.toString());
+    Logger.log('ERROR Row ' + rowNumber + ': ' + error.toString());
     return {
       success: false,
       rowNumber: rowNumber,
@@ -204,13 +207,28 @@ function processSingleRowUnified(rowData, rowNumber, mode = 'MANUAL') {
 
 /**
  * Build Zoho API payload from row data using dynamic field mapping
+ * @param {Array} rowData - The row data array
+ * @returns {Object|null} The payload object or null if configuration is incomplete
+ * @throws {Error} If critical errors occur during payload building
  */
 function buildZohoPayload(rowData) {
   try {
+    // Validate input
+    if (!rowData || !Array.isArray(rowData)) {
+      throw new Error('Invalid row data: must be a non-empty array');
+    }
+    
     // Get configuration
     const config = getConfigurationValues();
     if (!config.authTokenName || !config.authTokenValue) {
-      Logger.log('Configuration incomplete - missing auth tokens');
+      const error = new Error('Configuration incomplete - missing auth tokens');
+      ZohoErrorHandler_logError(ZOHO_ERROR_CODES.CONFIGURATION_ERROR, error, { config });
+      return null;
+    }
+    
+    if (!config.orgCode || !config.orgTypeCode) {
+      const error = new Error('Configuration incomplete - missing organization settings');
+      ZohoErrorHandler_logError(ZOHO_ERROR_CODES.CONFIGURATION_ERROR, error, { config });
       return null;
     }
     
@@ -220,7 +238,6 @@ function buildZohoPayload(rowData) {
       startDate = new Date(config.campaignStartDate);
       endDate = new Date(config.campaignEndDate);
     } else {
-      // Fallback to calculated dates
       startDate = new Date();
       const campaign_length = 30;
       endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
@@ -240,17 +257,16 @@ function buildZohoPayload(rowData) {
       Campaign_End_Date: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
     };
     
-    // Get selected fields and build payload dynamically
-    const selectedFields = getSelectedFields();
+    // Get visible fields to match spreadsheet structure
+    const visibleFields = getVisibleFields();
     
-    selectedFields.forEach((field, index) => {
+    visibleFields.forEach((field, index) => {
       if (field.apiName !== 'Zoho_Record_URL' && field.apiName !== 'Time_Created_in_Zoho' && field.apiName !== 'AssignmentValue') {
         const value = rowData[index];
         
         if (value !== null && value !== undefined && value !== '') {
-          // Special handling for phone field
           if (field.apiName === 'Phone') {
-            payload[field.apiName] = String(value).replace(/[^0-9+]/g, '');
+            payload[field.apiName] = normalizePhoneNumber(value);
           } else {
             payload[field.apiName] = value;
           }
@@ -259,9 +275,9 @@ function buildZohoPayload(rowData) {
     });
     
     // Handle assignment field based on configuration
-    const assignmentField = selectedFields.find(f => f.apiName === 'AssignmentValue');
+    const assignmentField = visibleFields.find(f => f.apiName === 'AssignmentValue');
     if (assignmentField) {
-      const assignmentIndex = selectedFields.indexOf(assignmentField);
+      const assignmentIndex = visibleFields.indexOf(assignmentField);
       const assignmentValue = rowData[assignmentIndex];
       
       if (assignmentValue && assignmentValue.toString().trim() !== '') {
@@ -272,30 +288,84 @@ function buildZohoPayload(rowData) {
           case 'Sales_Rep':
             payload.AssignToSalesRepEmail = assignmentValue.toString().trim();
             break;
-          // ADMIN assignment doesn't need a value in the payload
         }
       }
     }
     
-    Logger.log('Payload built successfully using dynamic field mapping');
-    Logger.log('=== PAYLOAD DETAILS ===');
-    Logger.log('Full payload: ' + JSON.stringify(payload, null, 2));
-    Logger.log('Payload size: ' + JSON.stringify(payload).length + ' characters');
-    Logger.log('Selected fields: ' + selectedFields.map(f => f.displayName).join(', '));
-    Logger.log('======================');
     return payload;
     
   } catch (error) {
-    Logger.log('Error building payload: ' + error.toString());
+    Logger.log('ERROR building payload: ' + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Optimized payload builder using cached configuration data
+ */
+function buildZohoPayloadOptimized(rowData, cachedData) {
+  try {
+    const { config, visibleFields, campaignDates } = cachedData;
+    
+    const payload = {
+      auth_token_name: config.authTokenName,
+      auth_token_value: config.authTokenValue,
+      Datahub_Src: "Google Apps Script",
+      notify_record_owner: true,
+      OrgTypeCode: config.orgTypeCode,
+      Organization_Code: config.orgCode,
+      Consent_to_Contact_Captured: true,
+      Created_By_Email: Session.getActiveUser().getEmail(),
+      Campaign_Start_Date: campaignDates.startDate,
+      Campaign_End_Date: campaignDates.endDate
+    };
+    
+    visibleFields.forEach((field, index) => {
+      if (field.apiName !== 'Zoho_Record_URL' && field.apiName !== 'Time_Created_in_Zoho' && field.apiName !== 'AssignmentValue') {
+        const value = rowData[index];
+        if (value !== null && value !== undefined && value !== '') {
+          payload[field.apiName] = field.apiName === 'Phone' ? normalizePhoneNumber(value) : value;
+        }
+      }
+    });
+    
+    const assignmentField = visibleFields.find(f => f.apiName === 'AssignmentValue');
+    if (assignmentField) {
+      const assignmentValue = rowData[visibleFields.indexOf(assignmentField)];
+      if (assignmentValue && assignmentValue.toString().trim() !== '') {
+        switch (config.leadAssignment) {
+          case 'Store':
+            payload.ChannelOutletId_Updated = assignmentValue.toString().trim();
+            break;
+          case 'Sales_Rep':
+            payload.AssignToSalesRepEmail = assignmentValue.toString().trim();
+            break;
+        }
+      }
+    }
+    
+    return payload;
+  } catch (error) {
+    Logger.log('ERROR in optimized payload builder: ' + error.toString());
     return null;
   }
 }
 
 /**
  * Send payload to Zoho API
+ * @param {Object} payload - The payload to send to Zoho
+ * @param {Boolean} verboseLogging - Whether to log detailed request/response info
+ * @returns {Object} Result object with success status and data or error
  */
-function sendToZohoAPI(payload) {
+function sendToZohoAPI(payload, verboseLogging = false) {
   try {
+    // Validate payload
+    if (!payload || typeof payload !== 'object') {
+      const error = new Error('Invalid payload: must be a non-null object');
+      ZohoErrorHandler_logError(ZOHO_ERROR_CODES.API_ERROR, error, { payload });
+      return { success: false, error: error.message };
+    }
+    
     const options = {
       'method': 'POST',
       'contentType': 'application/json',
@@ -303,25 +373,45 @@ function sendToZohoAPI(payload) {
       'muteHttpExceptions': true
     };
     
-    Logger.log('=== API REQUEST DETAILS ===');
-    Logger.log('Webhook URL: ' + WEBHOOK_URL);
-    Logger.log('Request method: ' + options.method);
-    Logger.log('Content type: ' + options.contentType);
-    Logger.log('Request payload: ' + options.payload);
-    Logger.log('===========================');
-    
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
     
-    Logger.log('Webhook response code: ' + responseCode);
-    Logger.log('Webhook response: ' + responseText);
+    // Check for HTTP errors
+    if (responseCode < 200 || responseCode >= 300) {
+      const error = new Error(`HTTP ${responseCode}: ${responseText}`);
+      ZohoErrorHandler_logError(ZOHO_ERROR_CODES.API_ERROR, error, { 
+        responseCode, 
+        responseText,
+        payload: JSON.stringify(payload).substring(0, 500)
+      });
+      
+      // Try to extract error message from response
+      let errorMessage = `API returned HTTP ${responseCode}`;
+      try {
+        const errorData = JSON.parse(responseText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (parseError) {
+        // Silent fail on parse error
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        responseCode: responseCode
+      };
+    }
     
     // Parse response
     let responseData;
     try {
       responseData = JSON.parse(responseText);
     } catch (parseError) {
+      Logger.log('ERROR: Failed to parse API response: ' + parseError.toString());
       return {
         success: false,
         error: 'Failed to parse API response: ' + parseError.toString(),
@@ -330,28 +420,25 @@ function sendToZohoAPI(payload) {
     }
     
     // Extract record ID
-    let recordId = null;
     if (responseData && responseData.data && Array.isArray(responseData.data) && 
         responseData.data.length > 0 && responseData.data[0].code === "SUCCESS" && 
         responseData.data[0].details && responseData.data[0].details.id) {
       
-      recordId = responseData.data[0].details.id;
-      Logger.log('Record ID extracted: ' + recordId);
-      
       return {
         success: true,
-        recordId: recordId
+        recordId: responseData.data[0].details.id
       };
     } else {
+      Logger.log('ERROR: Zoho API did not return success: ' + responseText);
       return {
         success: false,
-        error: 'Zoho API did not return a success response: ' + responseText,
+        error: 'Zoho API did not return a success response',
         responseCode: responseCode
       };
     }
     
   } catch (error) {
-    Logger.log('Error calling Zoho API: ' + error.toString());
+    Logger.log('ERROR calling Zoho API: ' + error.toString());
     return {
       success: false,
       error: 'API call failed: ' + error.toString()
@@ -360,38 +447,42 @@ function sendToZohoAPI(payload) {
 }
 
 /**
- * Update spreadsheet with processing result
+ * Batch update spreadsheet with multiple row results
+ * @param {Array} updates - Array of {rowNumber, recordUrl, timestamp} objects
  */
-function updateSpreadsheetWithResult(rowNumber, recordId) {
+function batchUpdateSpreadsheet(updates) {
+  if (!updates || updates.length === 0) return { success: true };
+  
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
+    const visibleFields = getVisibleFields();
     
-    // Update record ID column using dynamic field mapping
-    try {
-      const recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index for getRange
-      sheet.getRange(rowNumber, recordUrlColumn).setValue(buildZohoRecordUrl(recordId));
-    } catch (error) {
-      Logger.log('Warning: Could not update Zoho Record URL column - ' + error.toString());
+    const recordUrlField = visibleFields.find(f => f.apiName === 'Zoho_Record_URL');
+    const timestampField = visibleFields.find(f => f.apiName === 'Time_Created_in_Zoho');
+    
+    if (!recordUrlField || !timestampField) {
+      Logger.log('ERROR: Could not find required columns for batch update');
+      return { success: false, error: 'Missing required columns' };
     }
     
-    // Update timestamp column using dynamic field mapping
-    try {
-      const timestampColumn = getColumnIndexByApiName('Time_Created_in_Zoho') + 1; // Convert to 1-based index for getRange
-      const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-      sheet.getRange(rowNumber, timestampColumn).setValue(timestamp);
-    } catch (error) {
-      Logger.log('Warning: Could not update timestamp column - ' + error.toString());
-    }
+    const recordUrlColumn = visibleFields.indexOf(recordUrlField) + 1;
+    const timestampColumn = visibleFields.indexOf(timestampField) + 1;
     
-    Logger.log('Spreadsheet updated for row ' + rowNumber);
+    // Prepare batch updates
+    updates.forEach(update => {
+      if (update.recordUrl) {
+        sheet.getRange(update.rowNumber, recordUrlColumn).setValue(update.recordUrl);
+      }
+      if (update.timestamp) {
+        sheet.getRange(update.rowNumber, timestampColumn).setValue(update.timestamp);
+      }
+    });
+    
     return { success: true };
     
   } catch (error) {
-    Logger.log('Error updating spreadsheet: ' + error.toString());
-    return { 
-      success: false, 
-      error: error.toString() 
-    };
+    Logger.log('ERROR in batch update: ' + error.toString());
+    return { success: false, error: error.toString() };
   }
 }
 
@@ -518,8 +609,19 @@ function findDuplicateRows() {
   let phoneColIdx, emailColIdx, recordUrlColIdx;
   try {
     phoneColIdx = getColumnIndexByApiName('Phone');
-    emailColIdx = getColumnIndexByApiName('Email');
     recordUrlColIdx = getColumnIndexByApiName('Zoho_Record_URL');
+    
+    // Email column is optional - check if it exists in selected fields
+    emailColIdx = null;
+    const selectedFields = getSelectedFields();
+    const emailField = selectedFields.find(f => f.apiName === 'Email');
+    if (emailField) {
+      const emailFieldIndex = selectedFields.indexOf(emailField);
+      emailColIdx = emailFieldIndex;
+      Logger.log("Email column found at index: " + emailColIdx);
+    } else {
+      Logger.log("Email column not in selected fields, skipping email duplicate check");
+    }
   } catch (e) {
     Logger.log("Error getting column indices for duplicate check: " + e.message);
     return { allDuplicateRows: new Set(), unsubmittedDuplicateRows: new Set(), duplicateStats: [] };
@@ -531,14 +633,22 @@ function findDuplicateRows() {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const rowNumber = i + 1;
-    const phone = row[phoneColIdx] ? String(row[phoneColIdx]).replace(/[^0-9]/g, '') : '';
-    const email = row[emailColIdx] ? String(row[emailColIdx]).trim().toLowerCase() : '';
+    
+    // Use standardized phone normalization
+    const phone = row[phoneColIdx] ? normalizePhoneNumber(row[phoneColIdx]) : '';
+    
+    // Use standardized email validation for normalization
+    const emailValidation = row[emailColIdx] ? validateEmailAddress(row[emailColIdx]) : { isValid: false };
+    const email = emailValidation.isValid && emailValidation.normalized ? emailValidation.normalized : '';
 
-    if (phone) {
+    // Only process non-empty phone numbers
+    if (phone && phone.length > 0) {
       if (!phoneOccurrences.has(phone)) phoneOccurrences.set(phone, []);
       phoneOccurrences.get(phone).push(rowNumber);
     }
-    if (email) {
+    
+    // Only process non-empty emails that contain @ symbol (basic validation) and only if email column exists
+    if (emailColIdx !== null && email && email.length > 0 && email.includes('@')) {
       if (!emailOccurrences.has(email)) emailOccurrences.set(email, []);
       emailOccurrences.get(email).push(rowNumber);
     }
@@ -584,44 +694,321 @@ function findDuplicateRows() {
 
 
 /**
- * Process all rows (called from progress dialog)
+ * Process all rows with optimizations (called from progress dialog)
  */
 function processAllRows() {
+  const startTime = new Date().getTime();
   const rowsToProcess = getRowsToProcess();
   const results = [];
+  const spreadsheetUpdates = [];
+  
+  Logger.log(`Starting batch processing of ${rowsToProcess.length} rows`);
   
   // Find all duplicates in the sheet before processing
   const { allDuplicateRows, unsubmittedDuplicateRows, duplicateStats } = findDuplicateRows();
 
+  // Cache configuration data to avoid repeated calls
+  const config = getConfigurationValues();
+  const visibleFields = getVisibleFields();
+  
+  let startDate, endDate;
+  if (config.campaignStartDate && config.campaignEndDate) {
+    startDate = new Date(config.campaignStartDate);
+    endDate = new Date(config.campaignEndDate);
+  } else {
+    startDate = new Date();
+    const campaign_length = 30;
+    endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
+  }
+  
+  const cachedData = {
+    config: config,
+    visibleFields: visibleFields,
+    campaignDates: {
+      startDate: Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd"),
+      endDate: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
+    }
+  };
+
+  // Process each row
   for (let i = 0; i < rowsToProcess.length; i++) {
     const row = rowsToProcess[i];
 
     // Check if the current row is a duplicate
     if (allDuplicateRows.has(row.rowNumber)) {
-      // If it's a duplicate, create a specific result and skip normal processing
       results.push({
         success: false,
         rowNumber: row.rowNumber,
         error: 'Duplicate phone or email',
-        isDuplicate: true // Custom flag for the UI
+        isDuplicate: true
       });
     } else {
-      // If not a duplicate, process as usual
-      const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL');
+      // Process with cached data
+      const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL', cachedData);
       results.push(result);
+      
+      // Collect spreadsheet updates for batch processing
+      if (result.success && result.updateData) {
+        spreadsheetUpdates.push({
+          rowNumber: row.rowNumber,
+          recordUrl: result.updateData.recordUrl,
+          timestamp: result.updateData.timestamp
+        });
+      }
     }
+  }
+  
+  // Batch update spreadsheet
+  if (spreadsheetUpdates.length > 0) {
+    Logger.log(`Batch updating ${spreadsheetUpdates.length} rows in spreadsheet`);
+    batchUpdateSpreadsheet(spreadsheetUpdates);
   }
   
   // Clean up stored data
   const properties = PropertiesService.getScriptProperties();
   properties.deleteProperty('ROWS_TO_PROCESS');
   
+  const totalTime = (new Date().getTime() - startTime) / 1000;
+  Logger.log(`Batch processing completed in ${totalTime.toFixed(2)} seconds`);
+  Logger.log(`Average: ${(totalTime / rowsToProcess.length).toFixed(2)} seconds per row`);
+  
   // Return a comprehensive object with results and duplicate info
   return {
     results: results,
     unsubmittedDuplicateRows: Array.from(unsubmittedDuplicateRows),
-    duplicateStats: duplicateStats
+    duplicateStats: duplicateStats,
+    processingTime: totalTime
   };
+}
+
+/**
+ * Process rows in batches with progress tracking
+ * @param {number} startIndex - Starting index in the rows array
+ * @param {number} batchSize - Number of rows to process in this batch
+ * @returns {Object} Batch processing results with progress info
+ */
+function processRowBatch(startIndex, batchSize) {
+  const properties = PropertiesService.getUserProperties();
+  const cache = CacheService.getScriptCache();
+  
+  // Check if processing is paused at the start
+  const isPaused = properties.getProperty('BATCH_PROCESSING_PAUSED') === 'true';
+  if (isPaused) {
+    return {
+      paused: true,
+      message: 'Processing is paused',
+      nextIndex: startIndex,
+      totalRows: getRowsToProcess().length,
+      processedCount: startIndex
+    };
+  }
+  
+  const rowsToProcess = getRowsToProcess();
+  const endIndex = Math.min(startIndex + batchSize, rowsToProcess.length);
+  const results = [];
+  const spreadsheetUpdates = [];
+  
+  const batchStartTime = new Date().getTime();
+  
+  // Get cached data or create it
+  let cachedData;
+  const cachedDataJson = cache.get('PROCESSING_CACHE');
+  if (cachedDataJson) {
+    cachedData = JSON.parse(cachedDataJson);
+  } else {
+    const config = getConfigurationValues();
+    const visibleFields = getVisibleFields();
+    
+    let startDate, endDate;
+    if (config.campaignStartDate && config.campaignEndDate) {
+      startDate = new Date(config.campaignStartDate);
+      endDate = new Date(config.campaignEndDate);
+    } else {
+      startDate = new Date();
+      const campaign_length = 30;
+      endDate = new Date(startDate.getTime() + campaign_length * 24 * 60 * 60 * 1000);
+    }
+    
+    cachedData = {
+      config: config,
+      visibleFields: visibleFields,
+      campaignDates: {
+        startDate: Utilities.formatDate(startDate, "GMT", "yyyy-MM-dd"),
+        endDate: Utilities.formatDate(endDate, "GMT", "yyyy-MM-dd")
+      }
+    };
+    
+    cache.put('PROCESSING_CACHE', JSON.stringify(cachedData), 600);
+  }
+  
+  // Get duplicate info
+  const duplicateInfoJson = cache.get('DUPLICATE_INFO');
+  let allDuplicateRows;
+  if (duplicateInfoJson) {
+    const duplicateInfo = JSON.parse(duplicateInfoJson);
+    allDuplicateRows = new Set(duplicateInfo.allDuplicateRows);
+  } else {
+    const { allDuplicateRows: duplicates, unsubmittedDuplicateRows, duplicateStats } = findDuplicateRows();
+    allDuplicateRows = duplicates;
+    cache.put('DUPLICATE_INFO', JSON.stringify({
+      allDuplicateRows: Array.from(duplicates),
+      unsubmittedDuplicateRows: Array.from(unsubmittedDuplicateRows),
+      duplicateStats: duplicateStats
+    }), 600);
+  }
+  
+  // Process batch - check pause state periodically
+  for (let i = startIndex; i < endIndex; i++) {
+    // Check pause state every 10 rows
+    if (i > startIndex && (i - startIndex) % 10 === 0) {
+      const currentPauseState = properties.getProperty('BATCH_PROCESSING_PAUSED') === 'true';
+      if (currentPauseState) {
+        // Save progress before pausing
+        if (spreadsheetUpdates.length > 0) {
+          batchUpdateSpreadsheet(spreadsheetUpdates);
+        }
+        saveProcessingProgress(i, results);
+        
+        return {
+          paused: true,
+          message: 'Processing paused',
+          results: results,
+          nextIndex: i,
+          totalRows: rowsToProcess.length,
+          processedCount: i,
+          hasMore: i < rowsToProcess.length
+        };
+      }
+    }
+    
+    const row = rowsToProcess[i];
+    
+    if (allDuplicateRows.has(row.rowNumber)) {
+      results.push({
+        success: false,
+        rowNumber: row.rowNumber,
+        error: 'Duplicate phone or email',
+        isDuplicate: true
+      });
+    } else {
+      const result = processSingleRowUnified(row.data, row.rowNumber, 'MANUAL', cachedData);
+      results.push(result);
+      
+      if (result.success && result.updateData) {
+        spreadsheetUpdates.push({
+          rowNumber: row.rowNumber,
+          recordUrl: result.updateData.recordUrl,
+          timestamp: result.updateData.timestamp
+        });
+      }
+    }
+    
+    // Update progress in cache
+    const progress = {
+      currentRow: i + 1,
+      totalRows: rowsToProcess.length,
+      currentRowNumber: row.rowNumber,
+      elapsedTime: new Date().getTime() - batchStartTime,
+      lastUpdate: new Date().getTime(),
+      processedCount: i + 1,
+      nextIndex: i + 1
+    };
+    cache.put('BATCH_PROGRESS', JSON.stringify(progress), 300);
+    
+    // Save progress to persistent storage every 10 rows
+    if ((i + 1) % 10 === 0) {
+      saveProcessingProgress(i + 1, results);
+    }
+  }
+  
+  // Batch update spreadsheet
+  if (spreadsheetUpdates.length > 0) {
+    batchUpdateSpreadsheet(spreadsheetUpdates);
+  }
+  
+  // Save final progress
+  saveProcessingProgress(endIndex, results);
+  
+  return {
+    results: results,
+    hasMore: endIndex < rowsToProcess.length,
+    nextIndex: endIndex,
+    totalRows: rowsToProcess.length,
+    processedCount: endIndex,
+    paused: false
+  };
+}
+
+/**
+ * Get current batch progress (called by client polling)
+ */
+function getBatchProgress() {
+  const cache = CacheService.getScriptCache();
+  const progressJson = cache.get('BATCH_PROGRESS');
+  return progressJson ? JSON.parse(progressJson) : null;
+}
+
+/**
+ * Save processing progress to persistent storage
+ */
+function saveProcessingProgress(processedCount, results) {
+  const properties = PropertiesService.getUserProperties();
+  const progressData = {
+    processedCount: processedCount,
+    timestamp: new Date().getTime(),
+    successCount: results.filter(r => r.success).length,
+    errorCount: results.filter(r => !r.success && !r.isDuplicate).length,
+    duplicateCount: results.filter(r => r.isDuplicate).length,
+    results: results
+  };
+  
+  properties.setProperty('BATCH_PROGRESS_PERSISTENT', JSON.stringify(progressData));
+}
+
+/**
+ * Get saved processing progress
+ */
+function getSavedProgress() {
+  const properties = PropertiesService.getUserProperties();
+  const progressJson = properties.getProperty('BATCH_PROGRESS_PERSISTENT');
+  return progressJson ? JSON.parse(progressJson) : null;
+}
+
+/**
+ * Clear saved processing progress
+ */
+function clearSavedProgress() {
+  const properties = PropertiesService.getUserProperties();
+  properties.deleteProperty('BATCH_PROGRESS_PERSISTENT');
+  properties.deleteProperty('BATCH_PROCESSING_PAUSED');
+}
+
+/**
+ * Pause batch processing
+ */
+function pauseProcessing() {
+  const properties = PropertiesService.getUserProperties();
+  properties.setProperty('BATCH_PROCESSING_PAUSED', 'true');
+  Logger.log('Batch processing paused');
+  return { success: true, message: 'Processing paused' };
+}
+
+/**
+ * Resume batch processing
+ */
+function resumeProcessing() {
+  const properties = PropertiesService.getUserProperties();
+  properties.setProperty('BATCH_PROCESSING_PAUSED', 'false');
+  Logger.log('Batch processing resumed');
+  return { success: true, message: 'Processing resumed' };
+}
+
+/**
+ * Check if processing is paused
+ */
+function isProcessingPaused() {
+  const properties = PropertiesService.getUserProperties();
+  return properties.getProperty('BATCH_PROCESSING_PAUSED') === 'true';
 }
 
 /**
@@ -775,23 +1162,12 @@ function getProcessedRowsCount() {
  * Show date confirmation dialog
  */
 function showDateConfirmationDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('zoho_unified_ui')
+  const html = HtmlService.createHtmlOutputFromFile('date_confirmation_dialog')
     .setWidth(550)
     .setHeight(450)
     .setTitle('Campaign Date Confirmation');
   
-  // Add a script to automatically show the date confirmation step
-  const htmlWithScript = html.getContent().replace(
-    'window.onload = function() {',
-    'window.onload = function() { showDateConfirmationStep(); return; '
-  );
-  
-  const modifiedHtml = HtmlService.createHtmlOutput(htmlWithScript)
-    .setWidth(550)
-    .setHeight(450)
-    .setTitle('Campaign Date Confirmation');
-  
-  SpreadsheetApp.getUi().showModalDialog(modifiedHtml, 'Confirm Campaign Dates');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Confirm Campaign Dates');
 }
 
 /**
@@ -803,7 +1179,12 @@ function updateCampaignDatesAndContinue(newStartDate, newEndDate) {
     properties.setProperty(CONFIG_CAMPAIGN_START_DATE, newStartDate);
     properties.setProperty(CONFIG_CAMPAIGN_END_DATE, newEndDate);
     
+    // Update setup completion date to today so user won't be prompted again today
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    properties.setProperty(CONFIG_SETUP_COMPLETION_DATE, today);
+    
     Logger.log('Campaign dates updated: Start=' + newStartDate + ', End=' + newEndDate);
+    Logger.log('Setup completion date updated to: ' + today);
     
     // Continue with processing
     continueWithProcessing();
