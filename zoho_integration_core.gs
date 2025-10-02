@@ -539,6 +539,7 @@ function validateEditEvent(e) {
 
 /**
  * Get all rows that haven't been submitted to Zoho yet
+ * OPTIMIZED: Uses batch reading instead of row-by-row iteration
  */
 function getUnsubmittedRows() {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -551,46 +552,49 @@ function getUnsubmittedRows() {
   const unsubmittedRows = [];
   
   // Try to get the record URL column using dynamic mapping
-  let recordUrlColumn;
+  let recordUrlColumnIndex;
   try {
-    recordUrlColumn = getColumnIndexByApiName('Zoho_Record_URL') + 1; // Convert to 1-based index
+    recordUrlColumnIndex = getColumnIndexByApiName('Zoho_Record_URL'); // 0-based index
   } catch (error) {
     Logger.log('Warning: Could not find Zoho_Record_URL column - ' + error.toString());
-    recordUrlColumn = null;
+    recordUrlColumnIndex = null;
   }
   
-  // Start from row 2 (skip header)
-  for (let rowNum = 2; rowNum <= lastRow; rowNum++) {
-    let isUnsubmitted = true;
+  // OPTIMIZATION: Read all data at once instead of row-by-row
+  const numRows = lastRow - 1; // Exclude header row
+  const numCols = sheet.getLastColumn();
+  const allData = sheet.getRange(2, 1, numRows, numCols).getValues();
+  
+  // Process each row from the batch-read data
+  for (let i = 0; i < allData.length; i++) {
+    const rowData = allData[i];
+    const rowNumber = i + 2; // Add 2 because we start from row 2 (1-based)
     
-    // Check if Record ID column is empty (if we found the column)
-    if (recordUrlColumn) {
-      try {
-        const recordIdCell = sheet.getRange(rowNum, recordUrlColumn).getValue();
-        if (recordIdCell && recordIdCell.toString().trim() !== '') {
-          isUnsubmitted = false;
-        }
-      } catch (error) {
-        Logger.log('Warning: Could not check record URL for row ' + rowNum + ' - ' + error.toString());
+    // Check if row has any data (not completely empty)
+    const hasData = rowData.some(cell => cell && cell.toString().trim() !== '');
+    
+    if (!hasData) {
+      continue; // Skip empty rows
+    }
+    
+    // Check if Record URL column is empty (if we found the column)
+    let isUnsubmitted = true;
+    if (recordUrlColumnIndex !== null && recordUrlColumnIndex < rowData.length) {
+      const recordUrlValue = rowData[recordUrlColumnIndex];
+      if (recordUrlValue && recordUrlValue.toString().trim() !== '') {
+        isUnsubmitted = false;
       }
     }
     
     if (isUnsubmitted) {
-      // Get all data for this row
-      const rowData = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
-      // Check if row has any data (not completely empty)
-      const hasData = rowData.some(cell => cell && cell.toString().trim() !== '');
-      
-      if (hasData) {
-        unsubmittedRows.push({
-          rowNumber: rowNum,
-          data: rowData
-        });
-      }
+      unsubmittedRows.push({
+        rowNumber: rowNumber,
+        data: rowData
+      });
     }
   }
   
+  Logger.log(`Found ${unsubmittedRows.length} unsubmitted rows out of ${numRows} total data rows`);
   return unsubmittedRows;
 }
 

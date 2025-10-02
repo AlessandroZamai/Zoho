@@ -1032,6 +1032,9 @@ function restructureSpreadsheet(selectedFields, newHeaders) {
   // Clear conditional formatting
   sheet.clearConditionalFormatRules();
   
+  // IMPORTANT: Remove all existing protections before restructuring
+  removeAllProtections(sheet);
+  
   // Remove extra columns if the new field count is less than current columns
   const currentColumnCount = sheet.getMaxColumns();
   const newColumnCount = newHeaders.length;
@@ -1076,10 +1079,31 @@ function refreshSpreadsheetFormatting(selectedFields) {
     entireSheet.clearNote();
   }
   
+  // IMPORTANT: Remove all existing protections before applying new formatting
+  removeAllProtections(sheet);
+  
   // Reapply field-specific formatting
   applyFieldFormatting(selectedFields);
   
   Logger.log('Spreadsheet formatting refreshed');
+}
+
+/**
+ * Remove all protections from the sheet
+ */
+function removeAllProtections(sheet) {
+  try {
+    const protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+    Logger.log(`Found ${protections.length} existing protections to remove`);
+    
+    protections.forEach(protection => {
+      protection.remove();
+    });
+    
+    Logger.log('All range protections removed');
+  } catch (error) {
+    Logger.log('Error removing protections: ' + error.toString());
+  }
 }
 
 /**
@@ -1158,7 +1182,7 @@ function highlightRequiredColumns(selectedFields) {
         const headerCell = sheet.getRange(1, columnIndex);
         
         if (leadAssignment === 'ADMIN') {
-          // Admin assignment - black background, white text, disabled input
+          // Admin assignment - black background, white text, no input required
           headerCell.setBackground('#000000'); // Black background
           headerCell.setFontColor('#ffffff'); // White text
           headerCell.setFontWeight('bold');
@@ -1169,18 +1193,16 @@ function highlightRequiredColumns(selectedFields) {
             dataRange.setBackground('#000000'); // Black background for data cells
             dataRange.setFontColor('#ffffff'); // White text for data cells
             
-            // Add data validation to reject any input
-            const rejectRule = SpreadsheetApp.newDataValidation()
-              .requireTextContains('=NOT(ISBLANK(A1))') // Only allow empty values
-              .setAllowInvalid(false)
-              .setHelpText('No input required. Record will automatically be assigned to your Zoho Dealer Admin.')
-              .build();
+            // DO NOT set any values - leave cells empty so they aren't picked up as unsubmitted rows
+            // The black background and note are sufficient visual indicators
             
-            dataRange.setDataValidation(rejectRule);
-            
-            // Set default value to indicate admin assignment
-            const adminValues = Array(lastRow - 1).fill(['ADMIN']);
-            dataRange.setValues(adminValues);
+            // Protect the range to prevent editing (optional - makes it read-only)
+            try {
+              const protection = dataRange.protect().setDescription('Admin Assignment - No input required');
+              protection.setWarningOnly(true); // Allow override with warning
+            } catch (protectionError) {
+              Logger.log('Could not protect admin assignment column: ' + protectionError.toString());
+            }
           }
           
           Logger.log(`Applied Admin assignment formatting to column: ${field.displayName} (column ${columnIndex})`);
