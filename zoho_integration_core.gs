@@ -357,7 +357,7 @@ function buildZohoPayloadOptimized(rowData, cachedData) {
  * @param {Boolean} verboseLogging - Whether to log detailed request/response info
  * @returns {Object} Result object with success status and data or error
  */
-function sendToZohoAPI(payload, verboseLogging = false) {
+function sendToZohoAPI(payload) {
   try {
     // Validate payload
     if (!payload || typeof payload !== 'object') {
