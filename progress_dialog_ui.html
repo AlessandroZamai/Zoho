@@ -420,10 +420,10 @@
       currentBatchIndex = startIndex;
       
       // Only set processing start time if starting fresh (not resuming)
-      if (!processingStartTime && startIndex === 0) {
+      // Set processing start time if not already set (supports resume)
+      if (!processingStartTime) {
         processingStartTime = new Date().getTime();
       }
-      
       // Hide resume notice when starting/resuming processing
       document.getElementById('resumeNotice').style.display = 'none';
       
