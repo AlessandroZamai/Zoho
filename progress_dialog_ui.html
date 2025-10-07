@@ -490,7 +490,7 @@
         return;
       }
       
-      results = results.concat(batchResult.results);
+      results.push(...batchResult.results);
       currentBatchIndex = batchResult.nextIndex;
       processedRows = batchResult.processedCount;
       
