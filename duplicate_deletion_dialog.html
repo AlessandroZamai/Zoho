@@ -174,11 +174,14 @@
     // Add loading spinner to button
     function setButtonLoading(buttonId, isLoading) {
       const button = document.getElementById(buttonId);
+      if (!button.dataset.originalHTML) {
+        button.dataset.originalHTML = button.innerHTML;
+      }
       if (isLoading) {
         button.innerHTML = '<span class="loading"></span>' + button.textContent;
         button.disabled = true;
       } else {
-        button.innerHTML = button.textContent.replace(/^.*?(\w)/, '$1');
+        button.innerHTML = button.dataset.originalHTML;
         button.disabled = false;
       }
     }
