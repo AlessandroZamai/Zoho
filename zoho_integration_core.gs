@@ -615,16 +615,13 @@ function findDuplicateRows() {
     phoneColIdx = getColumnIndexByApiName('Phone');
     recordUrlColIdx = getColumnIndexByApiName('Zoho_Record_URL');
     
-    // Email column is optional - check if it exists in selected fields
+    // Email column is optional - resolve by API name to get actual sheet index
     emailColIdx = null;
-    const selectedFields = getSelectedFields();
-    const emailField = selectedFields.find(f => f.apiName === 'Email');
-    if (emailField) {
-      const emailFieldIndex = selectedFields.indexOf(emailField);
-      emailColIdx = emailFieldIndex;
+    try {
+      emailColIdx = getColumnIndexByApiName('Email'); // 0-based
       Logger.log("Email column found at index: " + emailColIdx);
-    } else {
-      Logger.log("Email column not in selected fields, skipping email duplicate check");
+    } catch (e) {
+      Logger.log("Email column not found, skipping email duplicate check");
     }
   } catch (e) {
     Logger.log("Error getting column indices for duplicate check: " + e.message);

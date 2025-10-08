@@ -178,7 +178,13 @@
         button.dataset.originalHTML = button.innerHTML;
       }
       if (isLoading) {
-        button.innerHTML = '<span class="loading"></span>' + button.textContent;
+        // Create spinner element safely without innerHTML manipulation
+        const spinner = document.createElement('span');
+        spinner.className = 'loading';
+        const textNode = document.createTextNode(button.textContent);
+        button.textContent = ''; // Clear existing content
+        button.appendChild(spinner);
+        button.appendChild(textNode);
         button.disabled = true;
       } else {
         button.innerHTML = button.dataset.originalHTML;
@@ -194,8 +200,10 @@
         var data;
         
         try {
-          // Server-side injects data as JSON string, we need to parse it
-          data = JSON.parse('<?= data ?>');
+          // Server-side safely emits a JavaScript object literal (no parsing needed)
+          // Using <?!= ?> force-print scriptlet with JSON.stringify() for safe injection
+          // Note: The scriptlet syntax below will cause linter errors but is valid Google Apps Script template syntax
+          data = <?!= JSON.stringify(data) ?>;
         } catch (e) {
           throw new Error('No data received from server: ' + e.message);
         }

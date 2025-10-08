@@ -1045,6 +1045,10 @@ function restructureSpreadsheet(selectedFields, newHeaders) {
     for (let i = 0; i < columnsToDelete; i++) {
       sheet.deleteColumn(newColumnCount + 1); // Always delete the column after our new range
     }
+  } else if (newColumnCount > currentColumnCount) {
+    // Insert missing columns
+    const columnsToAdd = newColumnCount - currentColumnCount;
+    sheet.insertColumnsAfter(currentColumnCount, columnsToAdd);
   }
   
   // Set new headers
@@ -1113,8 +1117,8 @@ function applyFieldFormatting(selectedFields) {
   // Highlight required columns and apply special formatting
   highlightRequiredColumns(selectedFields);
   
-  // Apply data validation to fields that need it
-  applyDataValidationToSheet();
+  // Apply data validation to fields that need it (pass selectedFields to ensure correct column indexing)
+  applyDataValidationToSheet(selectedFields);
   
   Logger.log('Field-specific formatting applied');
 }
@@ -1235,13 +1239,15 @@ function highlightRequiredColumns(selectedFields) {
 
 /**
  * Apply data validation dropdowns to appropriate fields
+ * @param {Array} visibleFields - Optional array of visible fields. If not provided, will use getVisibleFields()
  */
-function applyDataValidationToSheet() {
+function applyDataValidationToSheet(visibleFields) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
-    const selectedFields = getSelectedFields();
+    // Use provided visible fields, or fall back to getVisibleFields() if not provided
+    const fieldsToUse = visibleFields || getVisibleFields();
     
-    selectedFields.forEach((field, index) => {
+    fieldsToUse.forEach((field, index) => {
       if (field.validation && field.validation.length > 0) {
         const columnIndex = index + 1; // Convert to 1-based index
         const lastRow = Math.max(sheet.getLastRow(), 1000); // Apply to at least 1000 rows

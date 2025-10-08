@@ -804,6 +804,13 @@
           processedRows = 0;
           currentBatchIndex = 0;
           
+          // Reset processing timer
+          if (metricsInterval) {
+            clearInterval(metricsInterval);
+            metricsInterval = null;
+          }
+          processingStartTime = null;
+          
           updateStatus('Saved progress cleared. Starting fresh...', false);
           
           // Start processing from beginning
