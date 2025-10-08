@@ -518,7 +518,12 @@
                         <!-- Required fields will be populated here -->
                     </div>
                     
-                    <h3 style="margin-bottom: 16px; margin-top: 24px; color: #333;">Optional Fields</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 16px;">
+                        <h3 style="margin: 0; color: #333;">Optional Fields</h3>
+                        <button class="btn btn-secondary" id="selectAllBtn" onclick="toggleSelectAll()" style="padding: 8px 16px; font-size: 13px;">
+                            Select All
+                        </button>
+                    </div>
                     <div id="optionalFields" class="field-group">
                         <!-- Optional fields will be populated here -->
                     </div>
@@ -1588,6 +1593,70 @@
 
             // Update button state
             updateButtonState();
+            
+            // Update Select All button text
+            updateSelectAllButtonText();
+        }
+
+        function toggleSelectAll() {
+            const optionalContainer = document.getElementById('optionalFields');
+            const optionalFieldElements = optionalContainer.querySelectorAll('.field-option:not(.required)');
+            
+            // Check if all optional fields are currently selected
+            const allSelected = Array.from(optionalFieldElements).every(element => {
+                const checkbox = element.querySelector('input[type="checkbox"]');
+                return checkbox.checked;
+            });
+            
+            // Toggle all optional fields
+            optionalFieldElements.forEach(element => {
+                const checkbox = element.querySelector('input[type="checkbox"]');
+                const fieldId = checkbox.id.replace('field_', '');
+                
+                // Find the field object from the checkbox ID
+                const field = {
+                    apiName: fieldId,
+                    displayName: element.querySelector('.field-name').textContent,
+                    required: false
+                };
+                
+                if (allSelected) {
+                    // Deselect all
+                    checkbox.checked = false;
+                    element.classList.remove('selected');
+                    selectedFields = selectedFields.filter(f => f.apiName !== field.apiName);
+                } else {
+                    // Select all
+                    checkbox.checked = true;
+                    element.classList.add('selected');
+                    // Only add if not already in selectedFields
+                    if (!selectedFields.some(f => f.apiName === field.apiName)) {
+                        selectedFields.push(field);
+                    }
+                }
+            });
+            
+            // Update button state
+            updateButtonState();
+            
+            // Update Select All button text
+            updateSelectAllButtonText();
+        }
+
+        function updateSelectAllButtonText() {
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            if (!selectAllBtn) return;
+            
+            const optionalContainer = document.getElementById('optionalFields');
+            const optionalFieldElements = optionalContainer.querySelectorAll('.field-option:not(.required)');
+            
+            // Check if all optional fields are currently selected
+            const allSelected = Array.from(optionalFieldElements).every(element => {
+                const checkbox = element.querySelector('input[type="checkbox"]');
+                return checkbox.checked;
+            });
+            
+            selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
         }
 
         function getSelectedFieldsForSaving() {

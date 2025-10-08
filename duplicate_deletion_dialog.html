@@ -1,4 +1,24 @@
 <!DOCTYPE html>
+<!--
+  DUPLICATE DELETION DIALOG
+  
+  This HTML file is designed for Google Apps Script HTML Service.
+  
+  SERVER-SIDE INTEGRATION REQUIREMENTS:
+  1. Replace the fallback data section in the JavaScript with:
+     window.serverData = <?= JSON.stringify(data) ?>;
+     
+  2. The 'data' object should contain:
+     - unsubmittedDuplicateRows: Array of row numbers to delete
+     - topStats: Array of objects with {type, value, count} properties
+     
+  3. Ensure the server-side function 'deleteSheetRows' is available
+  
+  SECURITY NOTES:
+  - All user data is properly escaped before DOM insertion
+  - Input validation is performed on all data structures
+  - Error handling prevents script execution failures
+-->
 <html>
 <head>
   <base target="_top">
@@ -72,6 +92,36 @@
       background-color: #e8eaed;
       color: #5f6368;
     }
+    .cancel-btn:hover {
+      background-color: #dadce0;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn:disabled:hover {
+      background-color: inherit;
+    }
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #ea4335;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error-message {
+      color: #ea4335;
+      font-size: 12px;
+      margin-top: 10px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -92,52 +142,174 @@
     <p>This action will permanently delete the duplicate rows that have <strong>not</strong> been submitted to Zoho. This cannot be undone.</p>
 
     <div class="footer">
-      <button onclick="google.script.host.close()" class="btn cancel-btn">Cancel</button>
-      <button onclick="deleteConfirmed()" class="btn delete-btn">Delete Duplicates</button>
+      <div class="error-message" id="errorMessage"></div>
+      <button onclick="google.script.host.close()" class="btn cancel-btn" id="cancelBtn">Cancel</button>
+      <button onclick="deleteConfirmed()" class="btn delete-btn" id="deleteBtn">Delete Duplicates</button>
     </div>
   </div>
 
   <script>
     let duplicateRowsToDelete = [];
 
-    window.onload = function() {
-      // The server-side function will pass the data as a stringified JSON object
-      const data = JSON.parse(<?= data ?>);
-      duplicateRowsToDelete = data.unsubmittedDuplicateRows;
+    // Utility function to safely escape HTML content
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
 
-      document.getElementById('totalDuplicates').textContent = data.unsubmittedDuplicateRows.length;
+    // Show error message to user
+    function showError(message) {
+      const errorElement = document.getElementById('errorMessage');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
 
-      const listElement = document.getElementById('topDuplicatesList');
-      if (data.topStats.length > 0) {
-        let listHtml = '';
-        data.topStats.forEach(stat => {
-          listHtml += `<div class="duplicate-entry">${stat.type}: ${stat.value} (found ${stat.count} times)</div>`;
-        });
-        listElement.innerHTML = listHtml;
+    // Hide error message
+    function hideError() {
+      const errorElement = document.getElementById('errorMessage');
+      errorElement.style.display = 'none';
+    }
+
+    // Add loading spinner to button
+    function setButtonLoading(buttonId, isLoading) {
+      const button = document.getElementById(buttonId);
+      if (!button.dataset.originalHTML) {
+        button.dataset.originalHTML = button.innerHTML;
+      }
+      if (isLoading) {
+        // Create spinner element safely without innerHTML manipulation
+        const spinner = document.createElement('span');
+        spinner.className = 'loading';
+        const textNode = document.createTextNode(button.textContent);
+        button.textContent = ''; // Clear existing content
+        button.appendChild(spinner);
+        button.appendChild(textNode);
+        button.disabled = true;
       } else {
-        listElement.innerHTML = '<p>No recurring duplicate values found.</p>';
+        button.innerHTML = button.dataset.originalHTML;
+        button.disabled = false;
+      }
+    }
+
+    window.onload = function() {
+      try {
+        hideError();
+        
+        // Get data from server-side template
+        var data;
+        
+        try {
+          // Server-side safely emits a JavaScript object literal (no parsing needed)
+          // Using <?!= ?> force-print scriptlet with JSON.stringify() for safe injection
+          // Note: The scriptlet syntax below will cause linter errors but is valid Google Apps Script template syntax
+          data = <?!= JSON.stringify(data) ?>;
+        } catch (e) {
+          throw new Error('No data received from server: ' + e.message);
+        }
+        
+        if (!data) {
+          throw new Error('No data received from server');
+        }
+        
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid data format received');
+        }
+        
+        if (!Array.isArray(data.unsubmittedDuplicateRows)) {
+          throw new Error('Invalid duplicate rows data');
+        }
+        
+        duplicateRowsToDelete = data.unsubmittedDuplicateRows;
+        
+        // Update total count
+        const totalElement = document.getElementById('totalDuplicates');
+        totalElement.textContent = data.unsubmittedDuplicateRows.length;
+        
+        // Update top duplicates list
+        const listElement = document.getElementById('topDuplicatesList');
+        
+        if (data.topStats && Array.isArray(data.topStats) && data.topStats.length > 0) {
+          let listHtml = '';
+          data.topStats.forEach(stat => {
+            if (stat && stat.type && stat.value !== undefined && stat.count) {
+              const safeType = escapeHtml(String(stat.type));
+              const safeValue = escapeHtml(String(stat.value));
+              const safeCount = escapeHtml(String(stat.count));
+              listHtml += `<div class="duplicate-entry">${safeType}: ${safeValue} (found ${safeCount} times)</div>`;
+            }
+          });
+          listElement.innerHTML = listHtml || '<p>No valid duplicate statistics found.</p>';
+        } else {
+          listElement.innerHTML = '<p>No recurring duplicate values found.</p>';
+        }
+        
+        // Enable delete button only if there are duplicates to delete
+        const deleteBtn = document.getElementById('deleteBtn');
+        if (duplicateRowsToDelete.length === 0) {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = 'No Duplicates to Delete';
+        }
+        
+      } catch (error) {
+        console.error('Error loading duplicate deletion dialog:', error);
+        showError('Failed to load duplicate data: ' + error.message);
+        
+        // Disable delete button on error
+        const deleteBtn = document.getElementById('deleteBtn');
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Error - Cannot Delete';
       }
     };
 
     function deleteConfirmed() {
-      // Disable buttons to prevent double-clicking
-      document.querySelector('.delete-btn').disabled = true;
-      document.querySelector('.cancel-btn').disabled = true;
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            alert(result.deletedCount + ' duplicate row(s) have been deleted.');
-          } else {
-            alert('An error occurred: ' + result.error);
-          }
-          google.script.host.close();
-        })
-        .withFailureHandler(function(error) {
-          alert('A critical error occurred: ' + error.message);
-          google.script.host.close();
-        })
-        .deleteSheetRows(duplicateRowsToDelete);
+      try {
+        hideError();
+        
+        // Validate we have rows to delete
+        if (!duplicateRowsToDelete || duplicateRowsToDelete.length === 0) {
+          showError('No duplicate rows to delete');
+          return;
+        }
+        
+        // Show loading state
+        setButtonLoading('deleteBtn', true);
+        document.getElementById('cancelBtn').disabled = true;
+        
+        google.script.run
+          .withSuccessHandler(function(result) {
+            try {
+              if (result && result.success) {
+                alert(result.deletedCount + ' duplicate row(s) have been deleted.');
+              } else {
+                const errorMsg = result && result.error ? result.error : 'Unknown error occurred';
+                alert('An error occurred: ' + errorMsg);
+              }
+            } catch (e) {
+              alert('An unexpected error occurred while processing the result.');
+            }
+            google.script.host.close();
+          })
+          .withFailureHandler(function(error) {
+            try {
+              const errorMsg = error && error.message ? error.message : 'Unknown error occurred';
+              alert('A critical error occurred: ' + errorMsg);
+            } catch (e) {
+              alert('A critical error occurred during the deletion process.');
+            }
+            google.script.host.close();
+          })
+          .deleteSheetRows(duplicateRowsToDelete);
+          
+      } catch (error) {
+        console.error('Error in deleteConfirmed:', error);
+        showError('Failed to initiate deletion: ' + error.message);
+        
+        // Re-enable buttons on error
+        setButtonLoading('deleteBtn', false);
+        document.getElementById('cancelBtn').disabled = false;
+      }
     }
   </script>
 </body>

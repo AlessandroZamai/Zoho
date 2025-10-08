@@ -20,7 +20,7 @@
     }
     
     .header {
-      padding: 20px;
+      padding: 15px 20px;
       border-bottom: 1px solid #e8eaed;
       background-color: #1a73e8;
       color: white;
@@ -33,8 +33,37 @@
     }
     
     .progress-section {
-      padding: 20px;
+      padding: 15px 20px;
       border-bottom: 1px solid #e8eaed;
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .metric {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    
+    .metric-label {
+      color: #5f6368;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .metric-value {
+      color: #202124;
+      font-weight: 600;
+      font-size: 16px;
     }
     
     .progress-bar-container {
@@ -52,6 +81,10 @@
       transition: width 0.3s ease;
     }
     
+    .progress-bar.paused {
+      background-color: #fbbc04;
+    }
+    
     .progress-text {
       font-size: 14px;
       color: #5f6368;
@@ -65,11 +98,52 @@
       margin-bottom: 10px;
     }
     
+    .control-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .control-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background-color 0.3s ease;
+    }
+    
+    .pause-btn {
+      background-color: #fbbc04;
+      color: #202124;
+    }
+    
+    .pause-btn:hover {
+      background-color: #f9ab00;
+    }
+    
+    .resume-btn {
+      background-color: #34a853;
+      color: white;
+    }
+    
+    .resume-btn:hover {
+      background-color: #2d9348;
+    }
+    
+    .control-btn:disabled {
+      background-color: #dadce0;
+      cursor: not-allowed;
+      color: #5f6368;
+    }
+    
     .results-section {
       flex: 1;
-      padding: 20px;
+      padding: 15px 20px;
       overflow-y: auto;
-      max-height: 300px;
+      max-height: 250px;
     }
     
     .result-item {
@@ -119,18 +193,6 @@
       margin-top: 8px;
       font-size: 12px;
       opacity: 0.8;
-    }
-    
-    .record-link {
-      color: #1a73e8;
-      text-decoration: none;
-      font-size: 12px;
-      margin-top: 4px;
-      display: block;
-    }
-    
-    .record-link:hover {
-      text-decoration: underline;
     }
     
     .footer {
@@ -209,6 +271,25 @@
     .summary-warning {
       color: #e37400;
     }
+    
+    .resume-notice {
+      background-color: #e8f0fe;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      border-left: 4px solid #1a73e8;
+    }
+    
+    .resume-notice-title {
+      font-weight: 600;
+      color: #1557b0;
+      margin-bottom: 8px;
+    }
+    
+    .resume-notice-text {
+      color: #5f6368;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -223,14 +304,39 @@
       <div class="progress-bar-container">
         <div class="progress-bar" id="progressBar"></div>
       </div>
+      
+      <div class="metrics-grid" id="metricsGrid" style="display: none;">
+        <div class="metric">
+          <span class="metric-label">Elapsed Time</span>
+          <span class="metric-value" id="elapsedTime">00:00</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Est. Time</span>
+          <span class="metric-value" id="estimatedTime">-</span>
+        </div>
+      </div>
+      
+      <div class="control-buttons" id="controlButtons" style="display: none;">
+        <button onclick="handlePause()" class="control-btn pause-btn" id="pauseBtn">⏸ Pause</button>
+        <button onclick="handleResume()" class="control-btn resume-btn" id="resumeBtn" style="display: none;">▶ Resume</button>
+      </div>
+      
+      <div class="control-buttons" id="clearProgressButtons" style="display: none; margin-top: 10px;">
+        <button onclick="handleClearProgress()" class="control-btn" id="clearProgressBtn" style="background-color: #ea4335; color: white;">🗑️ Clear Saved Progress</button>
+      </div>
     </div>
     
     <div class="results-section" id="resultsSection">
+      <div id="resumeNotice" style="display: none;" class="resume-notice">
+        <div class="resume-notice-title">📋 Previous Session Found</div>
+        <div class="resume-notice-text" id="resumeNoticeText"></div>
+      </div>
       <div class="summary" id="summary" style="display: none;">
         <div class="summary-item summary-success" id="successCount">✅ Successful: 0</div>
         <div class="summary-item summary-error" id="errorCount">❌ Failed: 0</div>
         <div class="summary-item summary-warning" id="warningCount">⚠️ Warnings: 0</div>
         <div class="summary-item summary-warning" id="duplicateCount">🗑️ Duplicates: 0</div>
+        <div class="summary-item" id="totalTime" style="color: #5f6368; margin-top: 10px;">⏱️ Total Time: -</div>
       </div>
       <div id="resultsList"></div>
     </div>
@@ -242,134 +348,319 @@
   </div>
 
   <script>
+    const BATCH_SIZE = 200;
+    
     let processingComplete = false;
+    let processingPaused = false;
+    let processingStartTime = null;
     let results = [];
     let totalRows = 0;
     let processedRows = 0;
+    let currentBatchIndex = 0;
     let successCount = 0;
     let errorCount = 0;
     let warningCount = 0;
     let duplicateCount = 0;
-    // This will hold the full duplicate info object for the new dialog
     let duplicateInfo = {};
+    let metricsInterval = null;
     
-    // Start processing when dialog loads
     window.onload = function() {
-      startProcessing();
+      checkForSavedProgress();
     };
     
-    function startProcessing() {
+    function checkForSavedProgress() {
+      updateStatus('Checking for previous session...', false);
+      
+      google.script.run
+        .withSuccessHandler(onSavedProgressChecked)
+        .withFailureHandler(onError)
+        .getSavedProgress();
+    }
+    
+    function onSavedProgressChecked(progress) {
+      if (progress && progress.processedCount > 0) {
+        showResumeNotice(progress);
+        document.getElementById('clearProgressButtons').style.display = 'flex';
+        setTimeout(() => startProcessing(progress.processedCount), 500);
+      } else {
+        startProcessing(0);
+      }
+    }
+    
+    function showResumeNotice(progress) {
+      const notice = document.getElementById('resumeNotice');
+      const noticeText = document.getElementById('resumeNoticeText');
+      
+      noticeText.innerHTML = `
+        Found previous session with ${progress.processedCount} rows processed 
+        (${progress.successCount} successful, ${progress.errorCount} failed, ${progress.duplicateCount} duplicates).
+        <br><strong>Resuming from row ${progress.processedCount + 1}...</strong>
+      `;
+      
+      notice.style.display = 'block';
+      
+      results = progress.results || [];
+      successCount = progress.successCount || 0;
+      errorCount = progress.errorCount || 0;
+      duplicateCount = progress.duplicateCount || 0;
+      processedRows = progress.processedCount || 0;
+    }
+    
+    function startProcessing(startIndex = 0) {
       updateStatus('Getting rows to process...', false);
       
       google.script.run
-        .withSuccessHandler(onRowsReceived)
+        .withSuccessHandler((rows) => onRowsReceived(rows, startIndex))
         .withFailureHandler(onError)
         .getRowsToProcess();
     }
     
-    function onRowsReceived(rows) {
+    function onRowsReceived(rows, startIndex) {
       totalRows = rows.length;
+      currentBatchIndex = startIndex;
+      
+      // Only set processing start time if starting fresh (not resuming)
+      // Set processing start time if not already set (supports resume)
+      if (!processingStartTime) {
+        processingStartTime = new Date().getTime();
+      }
+      // Hide resume notice when starting/resuming processing
+      document.getElementById('resumeNotice').style.display = 'none';
+      
       updateProgressText();
       
       if (totalRows === 0) {
         updateStatus('No unsubmitted rows found', true);
-        
-        // Show information about already processed rows
         google.script.run
           .withSuccessHandler(showIgnoredRowsInfo)
           .withFailureHandler(onError)
           .getProcessedRowsCount();
-        
         enableCloseButton();
         return;
       }
       
-      updateStatus('Checking for duplicates and processing ' + totalRows + ' unsubmitted rows...', false);
-      
-      // Start processing all rows
-      google.script.run
-        .withSuccessHandler(onProcessingComplete)
-        .withFailureHandler(onError)
-        .processAllRows();
-      
-      // Start polling for progress updates
-      pollProgress();
-    }
-    
-    function pollProgress() {
-      // This is a simple progress simulation since we can't get real-time updates
-      // from the server-side processing. In a real implementation, you might
-      // process rows one by one with callbacks for real-time updates.
-      
-      if (!processingComplete) {
-        setTimeout(pollProgress, 1000);
+      if (currentBatchIndex >= totalRows) {
+        updateStatus('All rows already processed', true);
+        enableCloseButton();
+        return;
       }
+      
+      updateStatus(`Processing ${totalRows} rows in batches of ${BATCH_SIZE}...`, false);
+      
+      document.getElementById('metricsGrid').style.display = 'grid';
+      document.getElementById('controlButtons').style.display = 'flex';
+      
+      // Start metrics update interval
+      if (!metricsInterval) {
+        metricsInterval = setInterval(updateMetrics, 500);
+      }
+      
+      // Initial metrics update
+      updateMetrics();
+      
+      processNextBatch();
     }
     
-    function onProcessingComplete(data) {
-      processingComplete = true;
-      // The server now returns a complex object
-      results = data.results;
-      duplicateInfo = {
-        unsubmittedDuplicateRows: data.unsubmittedDuplicateRows,
-        topStats: data.duplicateStats.slice(0, 3)
-      };
+    function processNextBatch() {
+      if (processingPaused) {
+        updateStatus('Processing paused - Click Resume to continue', true);
+        document.getElementById('progressBar').classList.add('paused');
+        return;
+      }
       
-      // Reset counters
-      successCount = 0;
-      errorCount = 0;
-      warningCount = 0;
-      duplicateCount = 0;
+      if (currentBatchIndex >= totalRows) {
+        onAllBatchesComplete();
+        return;
+      }
       
-      results.forEach(result => {
+      updateStatus(`Processing batch starting at row ${currentBatchIndex + 1}...`, false);
+      
+      google.script.run
+        .withSuccessHandler(onBatchComplete)
+        .withFailureHandler(onError)
+        .processRowBatch(currentBatchIndex, BATCH_SIZE);
+    }
+    
+    function onBatchComplete(batchResult) {
+      if (batchResult.paused) {
+        processingPaused = true;
+        document.getElementById('pauseBtn').style.display = 'none';
+        document.getElementById('resumeBtn').style.display = 'block';
+        updateStatus('Processing paused', true);
+        return;
+      }
+      
+      results.push(...batchResult.results);
+      currentBatchIndex = batchResult.nextIndex;
+      processedRows = batchResult.processedCount;
+      
+      batchResult.results.forEach(result => {
         if (result.isDuplicate) {
           duplicateCount++;
-        }
-
-        if (result.success) {
+        } else if (result.success) {
           successCount++;
           if (result.validationWarnings && result.validationWarnings.length > 0) {
             warningCount++;
           }
         } else {
-          // All non-successes are counted as errors, including duplicates
           errorCount++;
         }
       });
       
-      processedRows = results.length;
-      
-      // Update UI
       updateProgressText();
+      updateProgressBar((processedRows / totalRows) * 100);
+      updateMetrics(); // Update metrics immediately after batch completion
+      
+      if (batchResult.hasMore) {
+        setTimeout(processNextBatch, 100);
+      } else {
+        onAllBatchesComplete();
+      }
+    }
+    
+    function onAllBatchesComplete() {
+      processingComplete = true;
+      
+      if (metricsInterval) {
+        clearInterval(metricsInterval);
+      }
+      
+      updateMetrics();
       updateProgressBar(100);
       updateStatus('Processing complete!', true);
-      showSummary();
-      displayResults();
-      enableButtons();
+      
+      google.script.run
+        .withSuccessHandler((cache) => {
+          if (cache && cache.duplicateStats) {
+            duplicateInfo = {
+              unsubmittedDuplicateRows: cache.unsubmittedDuplicateRows || [],
+              topStats: (cache.duplicateStats || []).slice(0, 3)
+            };
+          }
+          
+          const totalTime = (new Date().getTime() - processingStartTime) / 1000;
+          showSummary(totalTime);
+          displayResults();
+          enableButtons();
+          
+          google.script.run.clearSavedProgress();
+        })
+        .withFailureHandler(() => {
+          const totalTime = (new Date().getTime() - processingStartTime) / 1000;
+          showSummary(totalTime);
+          displayResults();
+          enableButtons();
+        })
+        .getSavedProgress();
+    }
+    
+    function handlePause() {
+      processingPaused = true;
+      document.getElementById('pauseBtn').disabled = true;
+      
+      // Stop the metrics interval when pausing
+      if (metricsInterval) {
+        clearInterval(metricsInterval);
+        metricsInterval = null;
+      }
+      
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('pauseBtn').style.display = 'none';
+          document.getElementById('resumeBtn').style.display = 'block';
+          document.getElementById('resumeBtn').disabled = false;
+          updateStatus('Processing paused - Click Resume to continue', true);
+          document.getElementById('progressBar').classList.add('paused');
+        })
+        .withFailureHandler(onError)
+        .pauseProcessing();
+    }
+    
+    function handleResume() {
+      document.getElementById('resumeBtn').disabled = true;
+      
+      google.script.run
+        .withSuccessHandler(() => {
+          processingPaused = false;
+          document.getElementById('resumeBtn').style.display = 'none';
+          document.getElementById('pauseBtn').style.display = 'block';
+          document.getElementById('pauseBtn').disabled = false;
+          document.getElementById('progressBar').classList.remove('paused');
+          document.getElementById('clearProgressButtons').style.display = 'none';
+          updateStatus('Resuming processing...', false);
+          
+          // Set processing start time when resume button is pressed
+          if (!processingStartTime) {
+            processingStartTime = new Date().getTime();
+          }
+          
+          // Restart the metrics interval when resuming
+          if (!metricsInterval) {
+            metricsInterval = setInterval(updateMetrics, 500);
+          }
+          
+          processNextBatch();
+        })
+        .withFailureHandler((error) => {
+          document.getElementById('resumeBtn').disabled = false;
+          const errorMsg = error && error.message ? error.message : (typeof error === 'string' ? error : 'Unknown error occurred');
+          updateStatus('Error resuming: ' + errorMsg, true);
+          
+          const resultsList = document.getElementById('resultsList');
+          const errorItem = document.createElement('div');
+          errorItem.className = 'result-item result-error';
+          errorItem.innerHTML = `<span class="row-number">Resume Error:</span> ${errorMsg}`;
+          resultsList.appendChild(errorItem);
+        })
+        .resumeProcessing();
+    }
+    
+    function updateMetrics() {
+      if (!processingStartTime) return;
+      
+      const elapsed = (new Date().getTime() - processingStartTime) / 1000;
+      const remainingRows = totalRows - processedRows;
+      const estimatedTime = remainingRows * 2.5; // Static estimate: 2.5 seconds per remaining row
+      
+      document.getElementById('elapsedTime').textContent = formatTime(elapsed);
+      document.getElementById('estimatedTime').textContent = formatTime(estimatedTime);
+    }
+    
+    function formatTime(seconds) {
+      if (!isFinite(seconds) || seconds < 0) return '-';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     
     function displayResults() {
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '';
       
-      results.forEach(result => {
+      const problemResults = results.filter(r => 
+        !r.success || r.isDuplicate || (r.validationWarnings && r.validationWarnings.length > 0)
+      );
+      
+      if (problemResults.length === 0) {
+        const successMsg = document.createElement('div');
+        successMsg.className = 'result-item result-success';
+        successMsg.innerHTML = '<span class="row-number">✅</span>All rows processed successfully with no errors or warnings!';
+        resultsList.appendChild(successMsg);
+        return;
+      }
+      
+      problemResults.forEach(result => {
         const resultItem = document.createElement('div');
-        
         let content = `<span class="row-number">Row ${result.rowNumber}:</span>`;
         
         if (result.isDuplicate) {
           resultItem.className = 'result-item result-duplicate';
           content += `Marked as duplicate`;
           content += `<div class="error-details">This row has the same phone or email as another row.</div>`;
-        } else if (result.success) {
-          resultItem.className = 'result-item result-success';
-          content += `Successfully sent to Zoho`;
-          if (result.recordId) {
-            content += `<a href="https://crm.zoho.com/crm/org820120607/tab/Leads/${result.recordId}" target="_blank" class="record-link">View in Zoho CRM</a>`;
-          }
-          if (result.validationWarnings && result.validationWarnings.length > 0) {
-            content += `<div class="error-details">Warnings: ${result.validationWarnings.join(', ')}</div>`;
-          }
+        } else if (result.success && result.validationWarnings && result.validationWarnings.length > 0) {
+          resultItem.className = 'result-item result-warning';
+          content += `Sent with warnings`;
+          content += `<div class="error-details">Warnings: ${result.validationWarnings.join(', ')}</div>`;
         } else {
           resultItem.className = 'result-item result-error';
           content += `Failed to send`;
@@ -385,12 +676,17 @@
       });
     }
     
-    function showSummary() {
+    function showSummary(processingTime) {
       const summary = document.getElementById('summary');
       document.getElementById('successCount').textContent = `✅ Successful: ${successCount}`;
       document.getElementById('errorCount').textContent = `❌ Failed: ${errorCount}`;
       document.getElementById('warningCount').textContent = `⚠️ Warnings: ${warningCount}`;
       document.getElementById('duplicateCount').textContent = `🗑️ Duplicates: ${duplicateCount}`;
+      
+      if (processingTime) {
+        document.getElementById('totalTime').textContent = `⏱️ Total Time: ${formatTime(processingTime)}`;
+      }
+      
       summary.style.display = 'block';
     }
     
@@ -413,9 +709,20 @@
     
     function enableButtons() {
       document.getElementById('closeBtn').disabled = false;
-      // Enable button if there are any unsubmitted duplicates to delete
       if (duplicateInfo.unsubmittedDuplicateRows && duplicateInfo.unsubmittedDuplicateRows.length > 0) {
         document.getElementById('deleteDuplicatesBtn').disabled = false;
+      }
+      document.getElementById('controlButtons').style.display = 'none';
+      
+      // Hide metrics and clear progress button when complete
+      document.getElementById('metricsGrid').style.display = 'none';
+      document.getElementById('clearProgressButtons').style.display = 'none';
+      
+      // Move summary to top of results section
+      const resultsSection = document.getElementById('resultsSection');
+      const summary = document.getElementById('summary');
+      if (summary && resultsSection) {
+        resultsSection.insertBefore(summary, resultsSection.firstChild);
       }
     }
     
@@ -429,11 +736,8 @@
         return;
       }
 
-      // Instead of confirm(), call the new server-side function to show the rich dialog
       google.script.run
         .withSuccessHandler(function() {
-          // The dialog is now open. This dialog will close, but the new one will appear.
-          // We can close this dialog for a cleaner experience.
           google.script.host.close();
         })
         .withFailureHandler(onError)
@@ -462,16 +766,62 @@
     
     function onError(error) {
       processingComplete = true;
-      updateStatus('Error: ' + error.message, true);
+      
+      if (metricsInterval) {
+        clearInterval(metricsInterval);
+      }
+      
+      const errorMsg = error && error.message ? error.message : (typeof error === 'string' ? error : 'Unknown error occurred');
+      updateStatus('Error: ' + errorMsg, true);
       enableCloseButton();
       
       const resultsList = document.getElementById('resultsList');
       const errorItem = document.createElement('div');
       errorItem.className = 'result-item result-error';
-      errorItem.innerHTML = `<span class="row-number">System Error:</span> ${error.message}`;
+      errorItem.innerHTML = `<span class="row-number">System Error:</span> ${errorMsg}`;
       resultsList.appendChild(errorItem);
     }
     
+    function handleClearProgress() {
+      if (!confirm('Are you sure you want to clear saved progress? This will start fresh from the beginning.')) {
+        return;
+      }
+      
+      document.getElementById('clearProgressBtn').disabled = true;
+      updateStatus('Clearing saved progress...', false);
+      
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('resumeNotice').style.display = 'none';
+          document.getElementById('clearProgressButtons').style.display = 'none';
+          
+          // Reset all counters
+          results = [];
+          successCount = 0;
+          errorCount = 0;
+          warningCount = 0;
+          duplicateCount = 0;
+          processedRows = 0;
+          currentBatchIndex = 0;
+          
+          // Reset processing timer
+          if (metricsInterval) {
+            clearInterval(metricsInterval);
+            metricsInterval = null;
+          }
+          processingStartTime = null;
+          
+          updateStatus('Saved progress cleared. Starting fresh...', false);
+          
+          // Start processing from beginning
+          setTimeout(() => startProcessing(0), 1000);
+        })
+        .withFailureHandler((error) => {
+          document.getElementById('clearProgressBtn').disabled = false;
+          alert('Error clearing progress: ' + error.message);
+        })
+        .clearSavedProgress();
+    }
     
     function closeDialog() {
       google.script.host.close();

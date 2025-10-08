@@ -11,11 +11,24 @@ function validateRowDataUnified(rowData, rowNumber) {
   const errors = [];
   const warnings = [];
   
-  // Get selected fields for validation
-  const selectedFields = getSelectedFields();
+  // Get visible fields to match spreadsheet structure (excludes hidden fields)
+  const visibleFields = getVisibleFields();
   
-  // Validate each field based on its configuration
-  selectedFields.forEach((field, index) => {
+  // Get list of hidden field API names to skip validation
+  const hiddenFieldApiNames = HIDDEN_FIELDS.map(f => f.apiName);
+  
+  // Validate each visible field based on its configuration
+  visibleFields.forEach((field, index) => {
+    // Skip validation for hidden fields (they're populated automatically in the payload)
+    if (hiddenFieldApiNames.includes(field.apiName)) {
+      return;
+    }
+    
+    // Skip validation for AssignmentValue field here - it has its own validation logic below
+    if (field.apiName === 'AssignmentValue') {
+      return;
+    }
+    
     const value = rowData[index];
     const fieldValue = value ? value.toString().trim() : '';
     
@@ -33,15 +46,16 @@ function validateRowDataUnified(rowData, rowNumber) {
     // Field-specific validation
     switch (field.apiName) {
       case 'Phone':
-        const cleanPhone = String(value).replace(/[^0-9+]/g, '');
-        if (cleanPhone.length < 10) {
-          errors.push('Phone must contain at least 10 digits');
+        const phoneValidation = validatePhoneNumber(value);
+        if (!phoneValidation.isValid) {
+          errors.push(phoneValidation.error);
         }
         break;
         
       case 'Email':
-        if (!fieldValue.includes('@') || !fieldValue.includes('.')) {
-          errors.push('Email format appears invalid');
+        const emailValidation = validateEmailAddress(value);
+        if (!emailValidation.isValid) {
+          errors.push(emailValidation.error);
         }
         break;
         
@@ -71,10 +85,26 @@ function validateRowDataUnified(rowData, rowNumber) {
   
   // Validate assignment field based on configuration
   const config = getConfigurationValues();
-  const assignmentField = selectedFields.find(f => f.apiName === 'AssignmentValue');
+  const assignmentField = visibleFields.find(f => f.apiName === 'AssignmentValue');
   
   if (assignmentField) {
-    const assignmentIndex = selectedFields.indexOf(assignmentField);
+    // Use visible field index to match spreadsheet column position
+    const assignmentIndex = visibleFields.indexOf(assignmentField);
+    
+    // Safety check: ensure the index is within bounds of rowData
+    if (assignmentIndex >= rowData.length) {
+      Logger.log(`Warning: AssignmentValue field index (${assignmentIndex}) is out of bounds for rowData length (${rowData.length})`);
+      Logger.log('Visible fields: ' + visibleFields.map(f => f.displayName).join(', '));
+      Logger.log('Row data length: ' + rowData.length);
+      errors.push('Configuration error: Assignment field index mismatch. Please run setup wizard again.');
+      return {
+        isValid: false,
+        errors: errors,
+        warnings: warnings,
+        rowNumber: rowNumber
+      };
+    }
+    
     const assignmentValue = rowData[assignmentIndex];
     const assignmentValueStr = assignmentValue ? assignmentValue.toString().trim() : '';
     
@@ -82,38 +112,44 @@ function validateRowDataUnified(rowData, rowNumber) {
       if (!assignmentValueStr) {
         errors.push('Channel Outlet ID is required for Store assignment');
       } else {
-        if (assignmentValueStr.length !== 11 || !/^\d+$/.test(assignmentValueStr)) {
-          errors.push('Channel Outlet ID must be exactly 11 digits');
+        if (assignmentValueStr.length !== 10 || !/^\d+$/.test(assignmentValueStr)) {
+          errors.push('Channel Outlet ID must be exactly 10 digits');
         }
       }
     } else if (config.leadAssignment === 'Sales_Rep') {
       if (!assignmentValueStr) {
         errors.push('Sales Rep Email is required for Sales Rep assignment');
       } else {
-        if (!assignmentValueStr.includes('@') || !assignmentValueStr.includes('.')) {
-          errors.push('Sales Rep Email format appears invalid');
+        // Use the proper email validation function
+        const emailValidation = validateEmailAddress(assignmentValueStr);
+        if (!emailValidation.isValid) {
+          errors.push('Sales Rep Email: ' + emailValidation.error);
         }
       }
     }
     // ADMIN assignment doesn't require any assignment value
   }
   
-  // Add warnings for commonly missing optional fields
-  const streetField = selectedFields.find(f => f.apiName === 'Street');
+  // Add warnings for commonly missing optional fields (use visible fields for indexing)
+  const streetField = visibleFields.find(f => f.apiName === 'Street');
   if (streetField) {
-    const streetIndex = selectedFields.indexOf(streetField);
-    const streetValue = rowData[streetIndex];
-    if (!streetValue || streetValue.toString().trim() === '') {
-      warnings.push('Street address is missing');
+    const streetIndex = visibleFields.indexOf(streetField);
+    if (streetIndex < rowData.length) {
+      const streetValue = rowData[streetIndex];
+      if (!streetValue || streetValue.toString().trim() === '') {
+        warnings.push('Street address is missing');
+      }
     }
   }
   
-  const cityField = selectedFields.find(f => f.apiName === 'City');
+  const cityField = visibleFields.find(f => f.apiName === 'City');
   if (cityField) {
-    const cityIndex = selectedFields.indexOf(cityField);
-    const cityValue = rowData[cityIndex];
-    if (!cityValue || cityValue.toString().trim() === '') {
-      warnings.push('City is missing');
+    const cityIndex = visibleFields.indexOf(cityField);
+    if (cityIndex < rowData.length) {
+      const cityValue = rowData[cityIndex];
+      if (!cityValue || cityValue.toString().trim() === '') {
+        warnings.push('City is missing');
+      }
     }
   }
   
@@ -203,63 +239,6 @@ function validateProcessingMode(expectedMode) {
 }
 
 /**
- * Validate spreadsheet structure
- * Ensures the spreadsheet has the expected columns and format
- */
-function validateSpreadsheetStructure() {
-  try {
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Use the dynamic headers function to get current expected headers
-    const expectedHeaders = getExpectedHeaders();
-    
-    const missingHeaders = [];
-    const extraHeaders = [];
-    
-    // Check for missing required headers
-    for (let i = 0; i < expectedHeaders.length; i++) {
-      if (i >= headers.length || headers[i] !== expectedHeaders[i]) {
-        missingHeaders.push(`Column ${i + 1}: Expected "${expectedHeaders[i]}", found "${headers[i] || 'empty'}"`);
-      }
-    }
-    
-    // Check for extra headers
-    if (headers.length > expectedHeaders.length) {
-      for (let i = expectedHeaders.length; i < headers.length; i++) {
-        extraHeaders.push(`Column ${i + 1}: Unexpected "${headers[i]}"`);
-      }
-    }
-    
-    if (missingHeaders.length > 0 || extraHeaders.length > 0) {
-      let errorMessage = 'Spreadsheet structure validation failed:\n';
-      if (missingHeaders.length > 0) {
-        errorMessage += 'Missing/incorrect headers:\n' + missingHeaders.join('\n') + '\n';
-      }
-      if (extraHeaders.length > 0) {
-        errorMessage += 'Extra headers:\n' + extraHeaders.join('\n');
-      }
-      
-      return {
-        isValid: false,
-        error: errorMessage
-      };
-    }
-    
-    return {
-      isValid: true,
-      message: 'Spreadsheet structure is valid'
-    };
-    
-  } catch (error) {
-    return {
-      isValid: false,
-      error: 'Error validating spreadsheet structure: ' + error.toString()
-    };
-  }
-}
-
-/**
  * Validate campaign dates
  * Ensures campaign dates are properly configured and logical
  */
@@ -341,62 +320,4 @@ function validateLeadAssignment(config) {
     isValid: true,
     assignment: config.leadAssignment
   };
-}
-
-/**
- * Comprehensive validation for processing setup
- * Runs all validation checks before processing begins
- */
-function validateProcessingSetup(mode) {
-  const validationResults = {
-    isValid: true,
-    errors: [],
-    warnings: [],
-    config: null
-  };
-  
-  // Validate processing mode
-  const modeValidation = validateProcessingMode(mode);
-  if (!modeValidation.isValid) {
-    validationResults.isValid = false;
-    validationResults.errors.push(modeValidation.error);
-    return validationResults;
-  }
-  
-  // Validate configuration
-  const configValidation = validateConfiguration();
-  if (!configValidation.isValid) {
-    validationResults.isValid = false;
-    validationResults.errors.push(configValidation.error);
-    return validationResults;
-  }
-  
-  validationResults.config = configValidation.config;
-  
-  // Validate spreadsheet structure
-  const structureValidation = validateSpreadsheetStructure();
-  if (!structureValidation.isValid) {
-    validationResults.isValid = false;
-    validationResults.errors.push(structureValidation.error);
-  }
-  
-  // Validate campaign dates
-  const dateValidation = validateCampaignDates(validationResults.config);
-  if (!dateValidation.isValid) {
-    if (dateValidation.warning) {
-      validationResults.warnings.push(dateValidation.warning);
-    } else {
-      validationResults.isValid = false;
-      validationResults.errors.push(dateValidation.error);
-    }
-  }
-  
-  // Validate lead assignment
-  const assignmentValidation = validateLeadAssignment(validationResults.config);
-  if (!assignmentValidation.isValid) {
-    validationResults.isValid = false;
-    validationResults.errors.push(assignmentValidation.error);
-  }
-  
-  return validationResults;
 }
