@@ -202,8 +202,9 @@
         try {
           // Server-side safely emits a JavaScript object literal (no parsing needed)
           // Using <?!= ?> force-print scriptlet with JSON.stringify() for safe injection
+          // The ?? null ensures we always get valid JavaScript even if data is undefined
           // Note: The scriptlet syntax below will cause linter errors but is valid Google Apps Script template syntax
-          data = <?!= JSON.stringify(data) ?>;
+          data = <?!= JSON.stringify(typeof data !== 'undefined' ? data : null) ?>;
         } catch (e) {
           throw new Error('No data received from server: ' + e.message);
         }
