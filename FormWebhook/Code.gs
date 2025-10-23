@@ -9,43 +9,72 @@
  * @param {Object} e - The form submit event object
  */
 function onFormSubmit(e) {
-  Logger.log('Form submission received');
+  console.log('=== FORM SUBMISSION STARTED ===');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Event object received:', e ? 'Yes' : 'No');
   
   try {
     // 1. Extract form responses
+    console.log('\n--- Step 1: Extracting form responses ---');
     const formData = extractFormResponses(e);
-    Logger.log('Form data extracted: ' + JSON.stringify(formData));
+    console.log('Form data extracted successfully');
+    console.log('Form data:', JSON.stringify(formData, null, 2));
+    console.log('Number of fields extracted:', Object.keys(formData).length);
     
     // 2. Validate required fields
+    console.log('\n--- Step 2: Validating form data ---');
     const validation = validateFormData(formData);
+    console.log('Validation result:', validation.isValid ? 'PASSED' : 'FAILED');
+    
     if (!validation.isValid) {
-      Logger.log('Validation failed: ' + validation.errors.join(', '));
+      console.error('Validation errors:', validation.errors);
+      console.log('Sending error notification email...');
       sendErrorEmail(validation.errors, formData);
+      console.log('=== FORM SUBMISSION ENDED (Validation Failed) ===');
       return;
     }
     
-    Logger.log('Validation passed');
+    console.log('All required fields validated successfully');
+    console.log('Validated data:', JSON.stringify(validation.validatedData, null, 2));
     
     // 3. Build webhook payload
+    console.log('\n--- Step 3: Building webhook payload ---');
     const payload = buildWebhookPayload(validation.validatedData);
-    Logger.log('Payload built successfully');
+    console.log('Payload built successfully');
+    console.log('Payload size:', JSON.stringify(payload).length, 'characters');
+    console.log('Payload preview:', JSON.stringify(payload, null, 2));
     
     // 4. Send to webhook
+    console.log('\n--- Step 4: Sending to Zoho webhook ---');
+    console.log('Webhook URL:', WEBHOOK_URL);
     const result = sendToWebhook(payload);
+    console.log('Webhook call completed');
+    console.log('Result:', JSON.stringify(result, null, 2));
     
     // 5. Handle result
+    console.log('\n--- Step 5: Processing webhook result ---');
     if (!result.success) {
-      Logger.log('Webhook submission failed: ' + result.error);
+      console.error('Webhook submission FAILED');
+      console.error('Error:', result.error);
+      console.error('Response code:', result.responseCode);
+      console.log('Sending error notification email...');
       sendErrorEmail([result.error], formData, result.responseCode);
+      console.log('=== FORM SUBMISSION ENDED (Webhook Failed) ===');
     } else {
-      Logger.log('SUCCESS: Lead successfully sent to Zoho. Record ID: ' + result.recordId);
-      Logger.log('Record URL: ' + buildZohoRecordUrl(result.recordId));
+      console.log('✓ SUCCESS: Lead successfully sent to Zoho');
+      console.log('✓ Record ID:', result.recordId);
+      console.log('✓ Record URL:', buildZohoRecordUrl(result.recordId));
+      console.log('=== FORM SUBMISSION ENDED (Success) ===');
     }
     
   } catch (error) {
-    Logger.log('ERROR in onFormSubmit: ' + error.toString());
-    Logger.log('Stack trace: ' + error.stack);
+    console.error('=== CRITICAL ERROR in onFormSubmit ===');
+    console.error('Error message:', error.toString());
+    console.error('Error name:', error.name);
+    console.error('Stack trace:', error.stack);
+    console.log('Sending error notification email...');
     sendErrorEmail(['Unexpected error: ' + error.toString()], null);
+    console.log('=== FORM SUBMISSION ENDED (Exception) ===');
   }
 }
 
@@ -58,27 +87,40 @@ function extractFormResponses(e) {
   const formData = {};
   
   try {
+    console.log('Extracting form responses from event object...');
+    
     // Get the item responses from the event
     const itemResponses = e.response.getItemResponses();
+    console.log('Number of item responses:', itemResponses.length);
     
     // Map each response to our field structure
-    itemResponses.forEach(function(itemResponse) {
+    let mappedCount = 0;
+    let unmappedCount = 0;
+    
+    itemResponses.forEach(function(itemResponse, index) {
       const question = itemResponse.getItem().getTitle();
       const answer = itemResponse.getResponse();
+      
+      console.log(`Response ${index + 1}:`, question, '=', answer);
       
       // Map question to field name using FORM_FIELD_MAPPING
       if (FORM_FIELD_MAPPING.hasOwnProperty(question)) {
         const fieldName = FORM_FIELD_MAPPING[question];
         formData[fieldName] = answer;
+        mappedCount++;
+        console.log(`  ✓ Mapped to field: ${fieldName}`);
       } else {
-        Logger.log('Warning: Unmapped form question: ' + question);
+        unmappedCount++;
+        console.warn(`  ⚠ Warning: Unmapped form question: ${question}`);
       }
     });
     
+    console.log(`Mapping summary: ${mappedCount} mapped, ${unmappedCount} unmapped`);
     return formData;
     
   } catch (error) {
-    Logger.log('Error extracting form responses: ' + error.toString());
+    console.error('Error extracting form responses:', error.toString());
+    console.error('Stack trace:', error.stack);
     throw new Error('Failed to extract form responses: ' + error.message);
   }
 }
@@ -90,20 +132,29 @@ function extractFormResponses(e) {
  */
 function buildWebhookPayload(validatedData) {
   try {
+    console.log('Building webhook payload...');
+    
     // Get authentication credentials
+    console.log('Retrieving authentication credentials...');
     const credentials = getAuthCredentials();
+    console.log('✓ Credentials retrieved');
     
     // Get campaign dates
+    console.log('Generating campaign dates...');
     const campaignDates = getCampaignDates();
+    console.log('✓ Campaign dates:', campaignDates);
     
     // Build the note field with blank line separators
+    console.log('Building note field...');
     const noteField = buildNoteField(
       validatedData.company,
       validatedData.newCustomer,
       validatedData.additionalDetails
     );
+    console.log('✓ Note field built:', noteField.substring(0, 100) + (noteField.length > 100 ? '...' : ''));
     
     // Build the complete payload
+    console.log('Assembling complete payload...');
     const payload = {
       // Authentication
       auth_token_name: credentials.authTokenName,
@@ -120,8 +171,8 @@ function buildWebhookPayload(validatedData) {
       Zip_Code: validatedData.postalCode || '',
       Language_Preference: validatedData.languagePreference || '',
       
-      // Combined note field
-      note: noteField,
+      // Description field (combined company, new customer, and additional details)
+      Description: noteField,
       
       // System fields
       Datahub_Src: DATAHUB_SOURCE,
@@ -130,14 +181,18 @@ function buildWebhookPayload(validatedData) {
       Organization_Code: KI_ORG_SETTINGS.orgCode,
       Consent_to_Contact_Captured: true,
       Created_By_Email: CREATED_BY_EMAIL,
+      Campaign_Name: 'EPP - REPLACE ASAP',
       Campaign_Start_Date: campaignDates.startDate,
-      Campaign_End_Date: campaignDates.endDate
+      Campaign_End_Date: campaignDates.endDate,
+      AssignToSalesRepEmail: 'sales.retail@telus.com'
     };
     
+    console.log('✓ Payload assembled with', Object.keys(payload).length, 'fields');
     return payload;
     
   } catch (error) {
-    Logger.log('Error building webhook payload: ' + error.toString());
+    console.error('Error building webhook payload:', error.toString());
+    console.error('Stack trace:', error.stack);
     throw new Error('Failed to build webhook payload: ' + error.message);
   }
 }
@@ -150,22 +205,28 @@ function buildWebhookPayload(validatedData) {
  * @returns {string} Formatted note field with blank line separators
  */
 function buildNoteField(company, newCustomer, additionalDetails) {
+  console.log('Building note field from components...');
   const parts = [];
   
   if (company && company.trim() !== '') {
     parts.push('Company: ' + company.trim());
+    console.log('  Added company to note');
   }
   
   if (newCustomer && newCustomer.trim() !== '') {
     parts.push('New customer: ' + newCustomer.trim());
+    console.log('  Added new customer status to note');
   }
   
   if (additionalDetails && additionalDetails.trim() !== '') {
     parts.push('Comments: ' + additionalDetails.trim());
+    console.log('  Added additional details to note');
   }
   
-  // Join with double newline for blank line separation
-  return parts.join('\n\n');
+  console.log('Note field has', parts.length, 'components');
+  
+  // Join with single newline (no extra line breaks)
+  return parts.join('\n');
 }
 
 /**
@@ -175,6 +236,7 @@ function buildNoteField(company, newCustomer, additionalDetails) {
  */
 function sendToWebhook(payload) {
   try {
+    console.log('Preparing HTTP request to webhook...');
     const options = {
       method: 'POST',
       contentType: 'application/json',
@@ -182,30 +244,41 @@ function sendToWebhook(payload) {
       muteHttpExceptions: true
     };
     
-    Logger.log('Sending request to webhook...');
+    console.log('Request method:', options.method);
+    console.log('Request content type:', options.contentType);
+    console.log('Request payload size:', options.payload.length, 'bytes');
+    
+    console.log('Sending request to webhook...');
+    const startTime = new Date().getTime();
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
+    const endTime = new Date().getTime();
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
     
-    Logger.log('Response code: ' + responseCode);
-    Logger.log('Response text: ' + responseText);
+    console.log('✓ Request completed in', (endTime - startTime), 'ms');
+    console.log('Response code:', responseCode);
+    console.log('Response text:', responseText);
+    console.log('Response headers:', JSON.stringify(response.getAllHeaders()));
     
     // Check for HTTP errors
     if (responseCode < 200 || responseCode >= 300) {
+      console.error('HTTP error detected:', responseCode);
       let errorMessage = `HTTP ${responseCode}: ${responseText}`;
       
       // Try to extract error message from response
       try {
         const errorData = JSON.parse(responseText);
+        console.log('Parsed error response:', JSON.stringify(errorData, null, 2));
         if (errorData.message) {
           errorMessage = errorData.message;
         } else if (errorData.error) {
           errorMessage = errorData.error;
         }
       } catch (parseError) {
-        // Use default error message if parsing fails
+        console.warn('Could not parse error response as JSON');
       }
       
+      console.error('Final error message:', errorMessage);
       return {
         success: false,
         error: errorMessage,
@@ -214,11 +287,14 @@ function sendToWebhook(payload) {
     }
     
     // Parse successful response
+    console.log('Parsing successful response...');
     let responseData;
     try {
       responseData = JSON.parse(responseText);
+      console.log('✓ Response parsed successfully');
+      console.log('Response data structure:', JSON.stringify(responseData, null, 2));
     } catch (parseError) {
-      Logger.log('Failed to parse API response: ' + parseError.toString());
+      console.error('Failed to parse API response:', parseError.toString());
       return {
         success: false,
         error: 'Failed to parse API response',
@@ -227,6 +303,7 @@ function sendToWebhook(payload) {
     }
     
     // Extract record ID from response
+    console.log('Extracting record ID from response...');
     if (responseData && 
         responseData.data && 
         Array.isArray(responseData.data) && 
@@ -235,12 +312,16 @@ function sendToWebhook(payload) {
         responseData.data[0].details && 
         responseData.data[0].details.id) {
       
+      const recordId = responseData.data[0].details.id;
+      console.log('✓ Record ID extracted:', recordId);
       return {
         success: true,
-        recordId: responseData.data[0].details.id
+        recordId: recordId
       };
     } else {
-      Logger.log('Zoho API did not return success: ' + responseText);
+      console.error('Zoho API did not return success');
+      console.error('Response structure does not match expected format');
+      console.error('Full response:', responseText);
       return {
         success: false,
         error: 'Zoho API did not return a success response',
@@ -249,7 +330,9 @@ function sendToWebhook(payload) {
     }
     
   } catch (error) {
-    Logger.log('Error calling Zoho API: ' + error.toString());
+    console.error('Exception calling Zoho API:', error.toString());
+    console.error('Error name:', error.name);
+    console.error('Stack trace:', error.stack);
     return {
       success: false,
       error: 'API call failed: ' + error.toString()
@@ -265,6 +348,7 @@ function sendToWebhook(payload) {
  */
 function sendErrorEmail(errors, formData, responseCode) {
   try {
+    console.log('Preparing error notification email...');
     const subject = 'EPP Callback Form Webhook Error';
     
     let body = 'An error occurred while processing a form submission:\n\n';
@@ -288,16 +372,18 @@ function sendErrorEmail(errors, formData, responseCode) {
     body += 'Script ID: ' + ScriptApp.getScriptId() + '\n';
     body += 'User: ' + Session.getActiveUser().getEmail() + '\n';
     
+    console.log('Sending error email to:', ERROR_NOTIFICATION_EMAIL);
     MailApp.sendEmail({
       to: ERROR_NOTIFICATION_EMAIL,
       subject: subject,
       body: body
     });
     
-    Logger.log('Error notification email sent to: ' + ERROR_NOTIFICATION_EMAIL);
+    console.log('✓ Error notification email sent successfully');
     
   } catch (emailError) {
-    Logger.log('Failed to send error notification email: ' + emailError.toString());
+    console.error('Failed to send error notification email:', emailError.toString());
+    console.error('Stack trace:', emailError.stack);
   }
 }
 
@@ -306,38 +392,50 @@ function sendErrorEmail(errors, formData, responseCode) {
  * Run this manually to check if everything is set up correctly
  */
 function testConfiguration() {
-  Logger.log('=== Testing Configuration ===');
+  console.log('=== TESTING CONFIGURATION ===');
+  console.log('Test started at:', new Date().toISOString());
   
   try {
     // Test 1: Check authentication credentials
-    Logger.log('Test 1: Checking authentication credentials...');
+    console.log('\n--- Test 1: Authentication Credentials ---');
     const credentials = getAuthCredentials();
-    Logger.log('✓ Auth credentials found');
-    Logger.log('  - Token Name: ' + credentials.authTokenName.substring(0, 10) + '...');
-    Logger.log('  - Token Value: ' + credentials.authTokenValue.substring(0, 10) + '...');
+    console.log('✓ Auth credentials found');
+    console.log('  - Token Name:', credentials.authTokenName.substring(0, 10) + '...');
+    console.log('  - Token Value:', credentials.authTokenValue.substring(0, 10) + '...');
     
     // Test 2: Check campaign dates
-    Logger.log('\nTest 2: Checking campaign dates...');
+    console.log('\n--- Test 2: Campaign Dates ---');
     const dates = getCampaignDates();
-    Logger.log('✓ Campaign dates generated');
-    Logger.log('  - Start Date: ' + dates.startDate);
-    Logger.log('  - End Date: ' + dates.endDate);
+    console.log('✓ Campaign dates generated');
+    console.log('  - Start Date:', dates.startDate);
+    console.log('  - End Date:', dates.endDate);
     
     // Test 3: Check webhook URL
-    Logger.log('\nTest 3: Checking webhook URL...');
-    Logger.log('✓ Webhook URL configured: ' + WEBHOOK_URL.substring(0, 50) + '...');
+    console.log('\n--- Test 3: Webhook URL ---');
+    console.log('✓ Webhook URL configured');
+    console.log('  - URL:', WEBHOOK_URL.substring(0, 50) + '...');
+    console.log('  - Length:', WEBHOOK_URL.length, 'characters');
     
     // Test 4: Test note field building
-    Logger.log('\nTest 4: Testing note field building...');
+    console.log('\n--- Test 4: Note Field Building ---');
     const testNote = buildNoteField('Test Company', 'Yes', 'Test comments');
-    Logger.log('✓ Note field built successfully:');
-    Logger.log(testNote);
+    console.log('✓ Note field built successfully');
+    console.log('Note content:');
+    console.log(testNote);
     
-    Logger.log('\n=== All Configuration Tests Passed ===');
+    // Test 5: Check error notification email
+    console.log('\n--- Test 5: Error Notification Email ---');
+    console.log('✓ Error notification email configured');
+    console.log('  - Recipient:', ERROR_NOTIFICATION_EMAIL);
+    
+    console.log('\n=== ALL CONFIGURATION TESTS PASSED ===');
+    console.log('Test completed at:', new Date().toISOString());
     return true;
     
   } catch (error) {
-    Logger.log('\n✗ Configuration test failed: ' + error.toString());
+    console.error('\n=== CONFIGURATION TEST FAILED ===');
+    console.error('Error:', error.toString());
+    console.error('Stack trace:', error.stack);
     return false;
   }
 }

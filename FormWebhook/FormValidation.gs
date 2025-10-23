@@ -16,6 +16,7 @@ function normalizePhoneNumber(phone) {
 
 /**
  * Validate phone number format
+ * Google Form validates format with regex: ^\d{10}$
  * @param {string} phone - The phone number to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -30,14 +31,7 @@ function validatePhoneNumber(phone) {
   
   const normalized = normalizePhoneNumber(phone);
   
-  if (normalized.length < 10) {
-    return { 
-      isValid: false, 
-      error: 'Phone must contain at least 10 digits',
-      normalized: normalized
-    };
-  }
-  
+  // Google Form already validates exactly 10 digits, just normalize
   return { 
     isValid: true, 
     normalized: normalized,
@@ -46,7 +40,8 @@ function validatePhoneNumber(phone) {
 }
 
 /**
- * Validate email format using regex
+ * Validate email format
+ * Google Form validates format with default email validation
  * @param {string} email - The email address to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -61,35 +56,7 @@ function validateEmail(email) {
   
   const emailStr = email.toString().trim();
   
-  // RFC 5322 compliant email regex (simplified but robust)
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-  
-  if (!emailRegex.test(emailStr)) {
-    return { 
-      isValid: false, 
-      error: 'Email format is invalid',
-      normalized: emailStr
-    };
-  }
-  
-  // Additional checks
-  if (emailStr.length > 254) {
-    return { 
-      isValid: false, 
-      error: 'Email address is too long',
-      normalized: emailStr
-    };
-  }
-  
-  const parts = emailStr.split('@');
-  if (parts[0].length > 64) {
-    return { 
-      isValid: false, 
-      error: 'Email local part is too long',
-      normalized: emailStr
-    };
-  }
-  
+  // Google Form already validates email format, just normalize to lowercase
   return { 
     isValid: true, 
     normalized: emailStr.toLowerCase(),
@@ -129,6 +96,7 @@ function validateProvince(province) {
 
 /**
  * Validate Canadian postal code format (optional field)
+ * Google Form validates format with regex: ^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$
  * @param {string} postalCode - The postal code to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -144,19 +112,8 @@ function validatePostalCode(postalCode) {
   
   const postalStr = postalCode.toString().trim().toUpperCase();
   
-  // Canadian postal code format: A1A 1A1 (with or without space)
-  const postalRegex = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/;
-  
-  if (!postalRegex.test(postalStr)) {
-    return { 
-      isValid: false, 
-      error: 'Postal code format is invalid. Expected format: A1A 1A1',
-      normalized: postalStr
-    };
-  }
-  
-  // Normalize to format with space: A1A 1A1
-  const normalized = postalStr.replace(/^([A-Z]\d[A-Z])(\d[A-Z]\d)$/, '$1 $2');
+  // Google Form already validates format, just normalize to A1A 1A1 format with space
+  const normalized = postalStr.replace(/^([A-Z]\d[A-Z])[\s-]?(\d[A-Z]\d)$/, '$1 $2');
   
   return { 
     isValid: true,
@@ -167,6 +124,7 @@ function validatePostalCode(postalCode) {
 
 /**
  * Validate language preference
+ * Converts "English" to "en-ca" and "Français" to "fr-ca"
  * @param {string} language - The language preference to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -180,21 +138,28 @@ function validateLanguagePreference(language) {
     };
   }
   
-  const validLanguages = ['en-ca', 'fr-ca', 'English', 'French'];
-  const languageLower = language.toString().trim().toLowerCase();
+  const languageTrimmed = language.toString().trim();
   
-  // Normalize to standard format
+  // Convert to standard format
   let normalized = '';
-  if (languageLower === 'english' || languageLower === 'en-ca' || languageLower === 'en') {
+  if (languageTrimmed === 'English') {
     normalized = 'en-ca';
-  } else if (languageLower === 'french' || languageLower === 'fr-ca' || languageLower === 'fr') {
+  } else if (languageTrimmed === 'Français') {
     normalized = 'fr-ca';
   } else {
-    return { 
-      isValid: false, 
-      error: 'Language preference must be English or French',
-      normalized: language.toString().trim()
-    };
+    // Accept already normalized values
+    const languageLower = languageTrimmed.toLowerCase();
+    if (languageLower === 'en-ca' || languageLower === 'en') {
+      normalized = 'en-ca';
+    } else if (languageLower === 'fr-ca' || languageLower === 'fr') {
+      normalized = 'fr-ca';
+    } else {
+      return { 
+        isValid: false, 
+        error: 'Language preference must be English or Français',
+        normalized: languageTrimmed
+      };
+    }
   }
   
   return { 

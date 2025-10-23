@@ -23,25 +23,25 @@ const KI_ORG_SETTINGS = {
 const CAMPAIGN_DURATION_DAYS = 10; // Campaign runs for 10 days from submission
 
 // System Settings
-const DATAHUB_SOURCE = 'EPP Callback Request ADD_FORM_URL';
+const DATAHUB_SOURCE = 'EPP Callback Request';
 const CREATED_BY_EMAIL = 'nick.paolini@telus.com';
 
 // Error Notification Settings
 const ERROR_NOTIFICATION_EMAIL = 'alessandro.zamai@telus.com';
 
 // Form Field Mapping
-// Maps form question titles to their corresponding field names
+// Maps bilingual form question titles to their corresponding field names
 const FORM_FIELD_MAPPING = {
-  'First Name': 'firstName',
-  'Last Name': 'lastName',
-  'Phone Number': 'phone',
-  'Email': 'email',
+  'First Name / Prénom': 'firstName',
+  'Last Name / Nom de famille': 'lastName',
+  'Phone Number / Numéro de téléphone': 'phone',
+  'Please provide your work email address / Veuillez fournir votre adresse de courriel professionnelle': 'email',
   'Province': 'province',
-  'Postal Code': 'postalCode',
-  'Language Preference': 'languagePreference',
-  'Are you an existing TELUS customer?': 'newCustomer',
-  'Company': 'company',
-  'Additional details': 'additionalDetails'
+  'Postal Code / Code postal': 'postalCode',
+  'Please enter your preferred language / Veuillez entrer votre langue de préférence': 'languagePreference',
+  'Are you an existing TELUS customer? / Êtes-vous déjà client de TELUS?': 'newCustomer',
+  'Name of your Employer/Organization / Nom de votre employeur/organisation': 'company',
+  'Additional Details / Renseignements additionnels': 'additionalDetails'
 };
 
 /**
