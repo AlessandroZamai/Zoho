@@ -4,19 +4,8 @@
  */
 
 /**
- * Normalize phone number to digits only
- * Removes all non-digit characters including + sign
- * @param {string} phone - The phone number to normalize
- * @returns {string} Normalized phone number (digits only)
- */
-function normalizePhoneNumber(phone) {
-  if (!phone) return '';
-  return String(phone).replace(/\D/g, '');
-}
-
-/**
- * Validate phone number format
- * Google Form validates format with regex: ^\d{10}$
+ * Normalize phone number to digits only and validate
+ * Google Form already validates format with regex: ^\d{10}$
  * @param {string} phone - The phone number to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -29,7 +18,8 @@ function validatePhoneNumber(phone) {
     };
   }
   
-  const normalized = normalizePhoneNumber(phone);
+  // Normalize: remove all non-digit characters
+  const normalized = phone ? String(phone).replace(/\D/g, '') : '';
   
   // Google Form already validates exactly 10 digits, just normalize
   return { 
@@ -41,7 +31,7 @@ function validatePhoneNumber(phone) {
 
 /**
  * Validate email format
- * Google Form validates format with default email validation
+ * Google Form already validates format with default email validation
  * @param {string} email - The email address to validate
  * @returns {Object} Validation result with isValid, normalized value, and error message
  */
@@ -54,15 +44,16 @@ function validateEmail(email) {
     };
   }
   
-  const emailStr = email.toString().trim();
-  
   // Google Form already validates email format, just normalize to lowercase
   return { 
     isValid: true, 
-    normalized: emailStr.toLowerCase(),
+    normalized: email.toString().trim().toLowerCase(),
     error: null
   };
 }
+
+// Valid Canadian province codes
+const VALID_PROVINCES = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
 
 /**
  * Validate Canadian province code
@@ -77,13 +68,12 @@ function validateProvince(province) {
     };
   }
   
-  const validProvinces = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
   const provinceUpper = province.toString().trim().toUpperCase();
   
-  if (!validProvinces.includes(provinceUpper)) {
+  if (!VALID_PROVINCES.includes(provinceUpper)) {
     return { 
       isValid: false, 
-      error: `Invalid province code. Must be one of: ${validProvinces.join(', ')}`
+      error: `Invalid province code. Must be one of: ${VALID_PROVINCES.join(', ')}`
     };
   }
   
@@ -110,10 +100,9 @@ function validatePostalCode(postalCode) {
     };
   }
   
-  const postalStr = postalCode.toString().trim().toUpperCase();
-  
   // Google Form already validates format, just normalize to A1A 1A1 format with space
-  const normalized = postalStr.replace(/^([A-Z]\d[A-Z])[\s-]?(\d[A-Z]\d)$/, '$1 $2');
+  const normalized = postalCode.toString().trim().toUpperCase()
+    .replace(/^([A-Z]\d[A-Z])[\s-]?(\d[A-Z]\d)$/, '$1 $2');
   
   return { 
     isValid: true,
@@ -121,6 +110,17 @@ function validatePostalCode(postalCode) {
     error: null
   };
 }
+
+// Language mapping for quick lookups
+const LANGUAGE_MAP = {
+  'english': 'en-ca',
+  'en': 'en-ca',
+  'en-ca': 'en-ca',
+  'français': 'fr-ca',
+  'francais': 'fr-ca',
+  'fr': 'fr-ca',
+  'fr-ca': 'fr-ca'
+};
 
 /**
  * Validate language preference
@@ -138,28 +138,15 @@ function validateLanguagePreference(language) {
     };
   }
   
-  const languageTrimmed = language.toString().trim();
+  const languageLower = language.toString().trim().toLowerCase();
+  const normalized = LANGUAGE_MAP[languageLower];
   
-  // Convert to standard format
-  let normalized = '';
-  if (languageTrimmed === 'English') {
-    normalized = 'en-ca';
-  } else if (languageTrimmed === 'Français') {
-    normalized = 'fr-ca';
-  } else {
-    // Accept already normalized values
-    const languageLower = languageTrimmed.toLowerCase();
-    if (languageLower === 'en-ca' || languageLower === 'en') {
-      normalized = 'en-ca';
-    } else if (languageLower === 'fr-ca' || languageLower === 'fr') {
-      normalized = 'fr-ca';
-    } else {
-      return { 
-        isValid: false, 
-        error: 'Language preference must be English or Français',
-        normalized: languageTrimmed
-      };
-    }
+  if (!normalized) {
+    return { 
+      isValid: false, 
+      error: 'Language preference must be English or Français',
+      normalized: language.toString().trim()
+    };
   }
   
   return { 
@@ -177,16 +164,9 @@ function validateLanguagePreference(language) {
 function sanitizeText(text) {
   if (!text) return '';
   
-  // Convert to string and trim
-  let sanitized = String(text).trim();
-  
-  // Remove any HTML tags
-  sanitized = sanitized.replace(/<[^>]*>/g, '');
-  
-  // Remove any script-like content
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  return sanitized;
+  // Convert to string, trim, and remove HTML/script tags in one pass
+  return String(text).trim()
+    .replace(/<[^>]*>|<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 }
 
 /**
@@ -198,18 +178,19 @@ function validateFormData(formData) {
   const errors = [];
   const validatedData = {};
   
-  // Validate First Name (required)
-  if (!formData.firstName || formData.firstName.trim() === '') {
-    errors.push('First Name is required');
-  } else {
-    validatedData.firstName = sanitizeText(formData.firstName);
-  }
+  // Required text fields validation (firstName, lastName)
+  const requiredFields = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' }
+  ];
   
-  // Validate Last Name (required)
-  if (!formData.lastName || formData.lastName.trim() === '') {
-    errors.push('Last Name is required');
-  } else {
-    validatedData.lastName = sanitizeText(formData.lastName);
+  // Process required text fields
+  for (const field of requiredFields) {
+    if (!formData[field.key] || formData[field.key].trim() === '') {
+      errors.push(`${field.label} is required`);
+    } else {
+      validatedData[field.key] = sanitizeText(formData[field.key]);
+    }
   }
   
   // Validate Phone (required)
@@ -236,26 +217,26 @@ function validateFormData(formData) {
     validatedData.province = provinceValidation.normalized;
   }
   
-  // Validate Postal Code (optional)
-  const postalValidation = validatePostalCode(formData.postalCode);
-  if (!postalValidation.isValid) {
-    errors.push(postalValidation.error);
-  } else {
-    validatedData.postalCode = postalValidation.normalized;
+  // Validate optional fields in one batch
+  const optionalValidations = [
+    { field: 'postalCode', validator: validatePostalCode },
+    { field: 'languagePreference', validator: validateLanguagePreference }
+  ];
+  
+  for (const validation of optionalValidations) {
+    const result = validation.validator(formData[validation.field]);
+    if (!result.isValid) {
+      errors.push(result.error);
+    } else {
+      validatedData[validation.field] = result.normalized;
+    }
   }
   
-  // Validate Language Preference (optional)
-  const languageValidation = validateLanguagePreference(formData.languagePreference);
-  if (!languageValidation.isValid) {
-    errors.push(languageValidation.error);
-  } else {
-    validatedData.languagePreference = languageValidation.normalized;
+  // Sanitize optional text fields in one batch
+  const optionalTextFields = ['company', 'newCustomer', 'additionalDetails'];
+  for (const field of optionalTextFields) {
+    validatedData[field] = sanitizeText(formData[field] || '');
   }
-  
-  // Sanitize optional text fields
-  validatedData.company = sanitizeText(formData.company || '');
-  validatedData.newCustomer = sanitizeText(formData.newCustomer || '');
-  validatedData.additionalDetails = sanitizeText(formData.additionalDetails || '');
   
   return {
     isValid: errors.length === 0,
