@@ -4,7 +4,7 @@
  */
 
 // Webhook URL for Zoho API
-const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_webhook_to_capture_lead/actions/execute?auth_type=apikey&zapikey=1003.26a3ebba6146ba321bb5690283cdf991.57db655a174cf1acff14b96739abfd3f';
+const WEBHOOK_URL = 'https://sandbox.zohoapis.com/crm/v7/functions/telus_epp_webhook_lead/actions/execute?auth_type=apikey&zapikey=1003.1ca18734501fe9a28dd1dcef693f5fe9.cc3b7ea0473f93d3ca69dfd1936dff71';
 
 // Zoho CRM URLs and organization settings
 const ZOHO_CRM_BASE_URL = 'https://crm.zoho.com/crm';
@@ -20,6 +20,7 @@ const KI_ORG_SETTINGS = {
 };
 
 // Campaign Settings
+const CAMPAIGN_NAME = 'EPP Hot Leads'
 const CAMPAIGN_DURATION_DAYS = 10; // Campaign runs for 10 days from submission
 
 // System Settings

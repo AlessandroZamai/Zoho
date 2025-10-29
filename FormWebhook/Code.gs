@@ -131,15 +131,16 @@ function buildWebhookPayload(validatedData) {
       
       // System fields
       Datahub_Src: DATAHUB_SOURCE,
-      notify_record_owner: true,
+      // notify_record_owner: true,
       OrgTypeCode: KI_ORG_SETTINGS.orgTypeCode,
       Organization_Code: KI_ORG_SETTINGS.orgCode,
       Consent_to_Contact_Captured: true,
       Created_By_Email: CREATED_BY_EMAIL,
-      Campaign_Name: 'EPP - REPLACE ASAP',
+      Campaign_Name: CAMPAIGN_NAME,
       Campaign_Start_Date: campaignDates.startDate,
       Campaign_End_Date: campaignDates.endDate,
-      AssignToSalesRepEmail: 'sales.retail@telus.com'
+      AssignToSalesRepUserID: "6634012000042308028",
+      lar_id: "6634012000603343117"
     };
     
   } catch (error) {
